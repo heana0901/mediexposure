@@ -1,0 +1,161 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import type { MonitoringResult, MonitoringRun, Provider } from "@/lib/types";
+
+type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
+
+type Props = {
+  clientName: string;
+  results: ResultWithKeyword[];
+  runs: MonitoringRun[];
+  selectedRunId: string | null;
+  onSelectRun: (runId: string) => void;
+};
+
+const PROVIDER_LABEL: Record<Provider, string> = {
+  chatgpt: "ChatGPT",
+  gemini: "Gemini",
+};
+
+function groupByKeyword(results: ResultWithKeyword[]) {
+  const map = new Map<string, ResultWithKeyword[]>();
+  for (const r of results) {
+    const list = map.get(r.keyword_id) ?? [];
+    list.push(r);
+    map.set(r.keyword_id, list);
+  }
+  return Array.from(map.entries());
+}
+
+function highlight(text: string, clientName: string) {
+  if (!clientName) return text;
+  const parts = text.split(clientName);
+  return parts.flatMap((part, i) =>
+    i === 0
+      ? [part]
+      : [
+          <mark key={i} className="bg-yellow-200 rounded px-0.5">
+            {clientName}
+          </mark>,
+          part,
+        ]
+  );
+}
+
+function KeywordCard({
+  clientName,
+  keywordText,
+  results,
+}: {
+  clientName: string;
+  keywordText: string;
+  results: ResultWithKeyword[];
+}) {
+  const mentionedCount = results.filter((r) => r.mentioned).length;
+  const overallRate = Math.round((mentionedCount / results.length) * 100);
+
+  const [activeProvider, setActiveProvider] = useState<Provider>(
+    results.find((r) => r.mentioned)?.provider ?? results[0].provider
+  );
+
+  const active = results.find((r) => r.provider === activeProvider) ?? results[0];
+
+  return (
+    <div className="border rounded-xl bg-white overflow-hidden">
+      <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+        <span className="font-medium text-sm text-gray-800">{keywordText}</span>
+        <span className="text-xs text-gray-500">
+          전체 언급률 <b className="text-gray-800">{overallRate}%</b> ({mentionedCount}/
+          {results.length}건)
+        </span>
+      </div>
+
+      <div className="grid gap-3 p-4" style={{ gridTemplateColumns: `repeat(${results.length}, 1fr)` }}>
+        {results.map((r) => (
+          <button
+            key={r.provider}
+            onClick={() => setActiveProvider(r.provider)}
+            className={`text-left border rounded-lg p-3 transition ${
+              activeProvider === r.provider
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            <div className="text-sm text-gray-600">{PROVIDER_LABEL[r.provider]}</div>
+            <div className="text-xl font-semibold">{r.mentioned ? "100%" : "0%"}</div>
+            <div className="text-xs mt-1">
+              {r.mentioned ? (
+                <span className="text-blue-600">{r.rank ? `${r.rank}순위 1회` : "언급 1회"}</span>
+              ) : (
+                <span className="text-red-400">미노출 1회</span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 pb-4">
+        <div className="text-xs text-gray-500 mb-2">
+          {PROVIDER_LABEL[active.provider]} 응답 결과
+        </div>
+        <div className="border rounded-lg p-3 max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap bg-gray-50">
+          {active.raw_response ? highlight(active.raw_response, clientName) : "응답 없음"}
+        </div>
+        {active.competitors.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className="text-xs text-gray-500 mr-1">경쟁 병원:</span>
+            {active.competitors.map((c) => (
+              <span
+                key={c}
+                className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-1"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ExposureStatus({ clientName, results, runs, selectedRunId, onSelectRun }: Props) {
+  const groups = useMemo(() => groupByKeyword(results), [results]);
+
+  return (
+    <div className="space-y-4">
+      {runs.length > 0 && (
+        <select
+          className="border rounded-lg px-3 py-2 text-sm"
+          value={selectedRunId ?? ""}
+          onChange={(e) => onSelectRun(e.target.value)}
+        >
+          {runs.map((run, i) => (
+            <option key={run.id} value={run.id}>
+              {new Date(run.created_at).toLocaleString("ko-KR")}{" "}
+              {i === 0 ? "(최신)" : ""}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {groups.length === 0 ? (
+        <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
+          <div className="text-4xl mb-3">👁</div>
+          <div className="font-medium text-gray-600">모니터링 결과가 없습니다</div>
+          <div className="text-sm">질문을 등록하고 모니터링을 실행해보세요</div>
+        </div>
+      ) : (
+        groups.map(([keywordId, group]) => (
+          <KeywordCard
+            key={keywordId}
+            clientName={clientName}
+            keywordText={group[0].keywords.text}
+            results={group}
+          />
+        ))
+      )}
+    </div>
+  );
+}

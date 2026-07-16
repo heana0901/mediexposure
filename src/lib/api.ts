@@ -1,0 +1,62 @@
+import type { Client, Keyword, MonitoringRun, MonitoringResult } from "./types";
+
+async function json<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `요청 실패 (${res.status})`);
+  }
+  return res.json();
+}
+
+export const api = {
+  listClients: () => fetch("/api/clients").then((r) => json<Client[]>(r)),
+
+  createClient: (name: string) =>
+    fetch("/api/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => json<Client>(r)),
+
+  listKeywords: (clientId: string) =>
+    fetch(`/api/clients/${clientId}/keywords`).then((r) => json<Keyword[]>(r)),
+
+  addKeyword: (clientId: string, text: string) =>
+    fetch(`/api/clients/${clientId}/keywords`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).then((r) => json<Keyword>(r)),
+
+  deleteKeyword: (id: string) =>
+    fetch(`/api/keywords/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
+
+  runMonitoring: (clientId: string) =>
+    fetch("/api/monitor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    }).then((r) =>
+      json<{ run: MonitoringRun; results: MonitoringResult[]; keywords: Keyword[] }>(r)
+    ),
+
+  listRuns: (clientId: string) =>
+    fetch(`/api/runs?clientId=${clientId}`).then((r) => json<MonitoringRun[]>(r)),
+
+  getRun: (runId: string) =>
+    fetch(`/api/runs/${runId}`).then((r) =>
+      json<{
+        run: MonitoringRun;
+        results: (MonitoringResult & { keywords: { text: string } })[];
+      }>(r)
+    ),
+
+  getCompetitorAnalysis: (clientId: string) =>
+    fetch(`/api/competitors?clientId=${clientId}`).then((r) =>
+      json<{
+        unexposed: (MonitoringResult & { keywords: { text: string } })[];
+        competitorFrequency: { name: string; count: number }[];
+        totalResults: number;
+      }>(r)
+    ),
+};
