@@ -18,6 +18,9 @@ export const api = {
       body: JSON.stringify(input),
     }).then((r) => json<Client>(r)),
 
+  deleteClient: (id: string) =>
+    fetch(`/api/clients/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
+
   listKeywords: (clientId: string) =>
     fetch(`/api/clients/${clientId}/keywords`).then((r) => json<Keyword[]>(r)),
 

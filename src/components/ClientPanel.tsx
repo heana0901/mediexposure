@@ -9,6 +9,7 @@ type Props = {
   selectedClientId: string | null;
   onSelectClient: (id: string) => void;
   onCreateClient: (input: ClientInput) => Promise<void>;
+  onDeleteClient: (id: string) => Promise<void>;
   keywords: Keyword[];
   onAddKeyword: (text: string) => Promise<void>;
   onDeleteKeyword: (id: string) => Promise<void>;
@@ -25,6 +26,7 @@ export function ClientPanel({
   selectedClientId,
   onSelectClient,
   onCreateClient,
+  onDeleteClient,
   keywords,
   onAddKeyword,
   onDeleteKeyword,
@@ -33,6 +35,7 @@ export function ClientPanel({
 }: Props) {
   const [newKeyword, setNewKeyword] = useState("");
   const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
@@ -41,6 +44,20 @@ export function ClientPanel({
     const text = newKeyword.trim();
     setNewKeyword("");
     await onAddKeyword(text);
+  }
+
+  async function handleDeleteClient() {
+    if (!selectedClient) return;
+    const confirmed = window.confirm(
+      `"${selectedClient.name}" 클라이언트를 삭제하시겠습니까?\n등록된 질문과 모니터링 기록이 모두 함께 삭제되며 되돌릴 수 없습니다.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await onDeleteClient(selectedClient.id);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -66,6 +83,16 @@ export function ClientPanel({
       >
         + 클라이언트 추가
       </button>
+
+      {selectedClient && (
+        <button
+          className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 bg-white hover:bg-red-50 disabled:opacity-50"
+          disabled={deleting}
+          onClick={handleDeleteClient}
+        >
+          {deleting ? "삭제 중..." : "클라이언트 삭제"}
+        </button>
+      )}
 
       <button
         className="ml-auto flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"

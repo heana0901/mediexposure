@@ -73,6 +73,12 @@ export function Dashboard() {
     setSelectedClientId(client.id);
   }
 
+  async function handleDeleteClient(id: string) {
+    await api.deleteClient(id);
+    setClients((prev) => prev.filter((c) => c.id !== id));
+    if (selectedClientId === id) setSelectedClientId(null);
+  }
+
   async function handleAddKeyword(text: string) {
     if (!selectedClientId) return;
     const keyword = await api.addKeyword(selectedClientId, text);
@@ -123,6 +129,7 @@ export function Dashboard() {
         selectedClientId={selectedClientId}
         onSelectClient={setSelectedClientId}
         onCreateClient={handleCreateClient}
+        onDeleteClient={handleDeleteClient}
         keywords={keywords}
         onAddKeyword={handleAddKeyword}
         onDeleteKeyword={handleDeleteKeyword}
