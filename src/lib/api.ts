@@ -1,4 +1,4 @@
-import type { Client, Keyword, MonitoringRun, MonitoringResult } from "./types";
+import type { Client, ClientInput, Keyword, MonitoringRun, MonitoringResult } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -11,11 +11,11 @@ async function json<T>(res: Response): Promise<T> {
 export const api = {
   listClients: () => fetch("/api/clients").then((r) => json<Client[]>(r)),
 
-  createClient: (name: string) =>
+  createClient: (input: ClientInput) =>
     fetch("/api/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(input),
     }).then((r) => json<Client>(r)),
 
   listKeywords: (clientId: string) =>

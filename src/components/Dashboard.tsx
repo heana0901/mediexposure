@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { Client, Keyword, MonitoringResult, MonitoringRun } from "@/lib/types";
+import type { Client, ClientInput, Keyword, MonitoringResult, MonitoringRun } from "@/lib/types";
 import { ClientPanel } from "./ClientPanel";
 import { ExposureStatus } from "./ExposureStatus";
 import { CompetitorAnalysis } from "./CompetitorAnalysis";
@@ -67,8 +67,8 @@ export function Dashboard() {
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
-  async function handleCreateClient(name: string) {
-    const client = await api.createClient(name);
+  async function handleCreateClient(input: ClientInput) {
+    const client = await api.createClient(input);
     setClients((prev) => [...prev, client]);
     setSelectedClientId(client.id);
   }

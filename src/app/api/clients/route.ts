@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { name } = await request.json();
+  const { name, region, department, director_name, is_specialist } = await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "병원명을 입력하세요." }, { status: 400 });
   }
@@ -21,7 +21,13 @@ export async function POST(request: Request) {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from("clients")
-    .insert({ name: name.trim() })
+    .insert({
+      name: name.trim(),
+      region: region?.trim() || null,
+      department: department?.trim() || null,
+      director_name: director_name?.trim() || null,
+      is_specialist: typeof is_specialist === "boolean" ? is_specialist : null,
+    })
     .select()
     .single();
 

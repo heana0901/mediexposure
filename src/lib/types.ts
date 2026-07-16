@@ -1,7 +1,19 @@
 export type Client = {
   id: string;
   name: string;
+  region: string | null;
+  department: string | null;
+  director_name: string | null;
+  is_specialist: boolean | null;
   created_at: string;
+};
+
+export type ClientInput = {
+  name: string;
+  region?: string;
+  department?: string;
+  director_name?: string;
+  is_specialist?: boolean | null;
 };
 
 export type Keyword = {
