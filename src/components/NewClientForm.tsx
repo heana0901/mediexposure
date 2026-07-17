@@ -1,26 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import type { ClientInput } from "@/lib/types";
+import type { Client, ClientInput } from "@/lib/types";
 
 type Props = {
-  onCreate: (input: ClientInput) => Promise<void>;
+  client?: Client;
+  onSubmit: (input: ClientInput) => Promise<void>;
   onClose: () => void;
 };
 
-export function NewClientForm({ onCreate, onClose }: Props) {
-  const [name, setName] = useState("");
-  const [region, setRegion] = useState("");
-  const [department, setDepartment] = useState("");
-  const [directorName, setDirectorName] = useState("");
-  const [isSpecialist, setIsSpecialist] = useState<"unknown" | "yes" | "no">("unknown");
+function toSpecialistOption(value: boolean | null | undefined): "unknown" | "yes" | "no" {
+  if (value === true) return "yes";
+  if (value === false) return "no";
+  return "unknown";
+}
+
+export function NewClientForm({ client, onSubmit, onClose }: Props) {
+  const isEdit = !!client;
+  const [name, setName] = useState(client?.name ?? "");
+  const [region, setRegion] = useState(client?.region ?? "");
+  const [department, setDepartment] = useState(client?.department ?? "");
+  const [directorName, setDirectorName] = useState(client?.director_name ?? "");
+  const [isSpecialist, setIsSpecialist] = useState<"unknown" | "yes" | "no">(
+    toSpecialistOption(client?.is_specialist)
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit() {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await onCreate({
+      await onSubmit({
         name: name.trim(),
         region: region.trim() || undefined,
         department: department.trim() || undefined,
@@ -36,7 +46,9 @@ export function NewClientForm({ onCreate, onClose }: Props) {
   return (
     <div className="w-full border rounded-xl bg-white p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">새 클라이언트 추가</span>
+        <span className="text-sm font-medium text-gray-700">
+          {isEdit ? "클라이언트 정보 수정" : "새 클라이언트 추가"}
+        </span>
         <button className="text-gray-400 hover:text-gray-600 text-sm" onClick={onClose}>
           닫기
         </button>
@@ -102,7 +114,7 @@ export function NewClientForm({ onCreate, onClose }: Props) {
         disabled={!name.trim() || saving}
         onClick={handleSubmit}
       >
-        {saving ? "추가 중..." : "추가"}
+        {saving ? "저장 중..." : isEdit ? "저장" : "추가"}
       </button>
     </div>
   );

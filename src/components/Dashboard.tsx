@@ -73,6 +73,11 @@ export function Dashboard() {
     setSelectedClientId(client.id);
   }
 
+  async function handleUpdateClient(id: string, input: ClientInput) {
+    const updated = await api.updateClient(id, input);
+    setClients((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  }
+
   async function handleDeleteClient(id: string) {
     await api.deleteClient(id);
     setClients((prev) => prev.filter((c) => c.id !== id));
@@ -129,6 +134,7 @@ export function Dashboard() {
         selectedClientId={selectedClientId}
         onSelectClient={setSelectedClientId}
         onCreateClient={handleCreateClient}
+        onUpdateClient={handleUpdateClient}
         onDeleteClient={handleDeleteClient}
         keywords={keywords}
         onAddKeyword={handleAddKeyword}

@@ -18,6 +18,13 @@ export const api = {
       body: JSON.stringify(input),
     }).then((r) => json<Client>(r)),
 
+  updateClient: (id: string, input: ClientInput) =>
+    fetch(`/api/clients/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }).then((r) => json<Client>(r)),
+
   deleteClient: (id: string) =>
     fetch(`/api/clients/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
 

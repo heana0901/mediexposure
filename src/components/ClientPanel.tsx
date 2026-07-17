@@ -9,6 +9,7 @@ type Props = {
   selectedClientId: string | null;
   onSelectClient: (id: string) => void;
   onCreateClient: (input: ClientInput) => Promise<void>;
+  onUpdateClient: (id: string, input: ClientInput) => Promise<void>;
   onDeleteClient: (id: string) => Promise<void>;
   keywords: Keyword[];
   onAddKeyword: (text: string) => Promise<void>;
@@ -26,6 +27,7 @@ export function ClientPanel({
   selectedClientId,
   onSelectClient,
   onCreateClient,
+  onUpdateClient,
   onDeleteClient,
   keywords,
   onAddKeyword,
@@ -34,7 +36,7 @@ export function ClientPanel({
   isRunning,
 }: Props) {
   const [newKeyword, setNewKeyword] = useState("");
-  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [clientFormMode, setClientFormMode] = useState<"none" | "create" | "edit">("none");
   const [deleting, setDeleting] = useState(false);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
@@ -79,10 +81,19 @@ export function ClientPanel({
 
       <button
         className="text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
-        onClick={() => setShowNewClientForm((v) => !v)}
+        onClick={() => setClientFormMode((m) => (m === "create" ? "none" : "create"))}
       >
         + 클라이언트 추가
       </button>
+
+      {selectedClient && (
+        <button
+          className="text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
+          onClick={() => setClientFormMode((m) => (m === "edit" ? "none" : "edit"))}
+        >
+          정보 수정
+        </button>
+      )}
 
       {selectedClient && (
         <button
@@ -102,10 +113,15 @@ export function ClientPanel({
         {isRunning ? "모니터링 실행 중..." : "▶ 모니터링 실행"}
       </button>
 
-      {showNewClientForm && (
+      {clientFormMode === "create" && (
+        <NewClientForm onSubmit={onCreateClient} onClose={() => setClientFormMode("none")} />
+      )}
+
+      {clientFormMode === "edit" && selectedClient && (
         <NewClientForm
-          onCreate={onCreateClient}
-          onClose={() => setShowNewClientForm(false)}
+          client={selectedClient}
+          onSubmit={(input) => onUpdateClient(selectedClient.id, input)}
+          onClose={() => setClientFormMode("none")}
         />
       )}
 
