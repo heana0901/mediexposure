@@ -2,19 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { Client, ClientInput, Keyword, MonitoringResult, MonitoringRun } from "@/lib/types";
+import type {
+  Client,
+  ClientInput,
+  Keyword,
+  MonitoringResult,
+  MonitoringRun,
+  TrendPoint,
+  UsageSummary,
+} from "@/lib/types";
 import { Sidebar, type Tab } from "./Sidebar";
 import { KeywordManager } from "./KeywordManager";
 import { NewClientForm } from "./NewClientForm";
 import { Modal } from "./Modal";
 import { ExposureStatus } from "./ExposureStatus";
 import { CompetitorAnalysis } from "./CompetitorAnalysis";
+import { TrendChart } from "./TrendChart";
+import { UsageDashboard } from "./UsageDashboard";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
 const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
   status: { title: "AI 노출현황", subtitle: "클라이언트별 AI 검색 노출도를 모니터링합니다" },
   competitors: { title: "경쟁병원분석", subtitle: "미노출 항목과 경쟁병원 언급 빈도를 분석합니다" },
+  trends: { title: "추이 분석", subtitle: "모니터링 실행 기록에 따른 언급률 변화를 확인합니다" },
+  usage: { title: "비용 현황", subtitle: "API 호출 횟수와 예상 비용을 확인합니다" },
 };
 
 export function Dashboard() {
@@ -35,6 +47,9 @@ export function Dashboard() {
     competitorFrequency: { name: string; count: number }[];
     totalResults: number;
   }>({ unexposed: [], competitorFrequency: [], totalResults: 0 });
+
+  const [trends, setTrends] = useState<TrendPoint[]>([]);
+  const [usage, setUsage] = useState<UsageSummary>({ totalRuns: 0, totalCostUsd: 0, byClient: [] });
 
   useEffect(() => {
     api.listClients().then(setClients).catch((e) => setError(e.message));
@@ -71,6 +86,16 @@ export function Dashboard() {
   useEffect(() => {
     if (tab !== "competitors" || !selectedClientId) return;
     api.getCompetitorAnalysis(selectedClientId).then(setCompetitorData).catch((e) => setError(e.message));
+  }, [tab, selectedClientId]);
+
+  useEffect(() => {
+    if (tab !== "trends" || !selectedClientId) return;
+    api.getTrends(selectedClientId).then(setTrends).catch((e) => setError(e.message));
+  }, [tab, selectedClientId]);
+
+  useEffect(() => {
+    if (tab !== "usage") return;
+    api.getUsage(selectedClientId ?? undefined).then(setUsage).catch((e) => setError(e.message));
   }, [tab, selectedClientId]);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
@@ -167,7 +192,9 @@ export function Dashboard() {
             </div>
           )}
 
-          {!selectedClientId ? (
+          {tab === "usage" ? (
+            <UsageDashboard usage={usage} />
+          ) : !selectedClientId ? (
             <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="font-medium text-gray-600">클라이언트를 선택해주세요</div>
               <div className="text-sm">왼쪽에서 클라이언트를 선택하거나 새로 추가하세요</div>
@@ -198,6 +225,8 @@ export function Dashboard() {
                   totalResults={competitorData.totalResults}
                 />
               )}
+
+              {tab === "trends" && <TrendChart data={trends} />}
             </>
           )}
         </div>

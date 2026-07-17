@@ -6,9 +6,21 @@ export type AnalysisResult = {
   mentioned: boolean;
   rank: number | null;
   competitors: string[];
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
 };
 
-const EMPTY_RESULT: AnalysisResult = { mentioned: false, rank: null, competitors: [] };
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || "gpt-4o-mini";
+
+const EMPTY_RESULT: AnalysisResult = {
+  mentioned: false,
+  rank: null,
+  competitors: [],
+  model: ANALYSIS_MODEL,
+  inputTokens: null,
+  outputTokens: null,
+};
 
 export async function analyzeResponse(
   rawText: string,
@@ -17,7 +29,7 @@ export async function analyzeResponse(
   if (!rawText.trim()) return EMPTY_RESULT;
 
   const completion = await client.chat.completions.create({
-    model: process.env.ANALYSIS_MODEL || "gpt-4o-mini",
+    model: ANALYSIS_MODEL,
     messages: [
       {
         role: "system",
@@ -55,8 +67,14 @@ ${rawText}
     },
   });
 
+  const usage = {
+    model: ANALYSIS_MODEL,
+    inputTokens: completion.usage?.prompt_tokens ?? null,
+    outputTokens: completion.usage?.completion_tokens ?? null,
+  };
+
   const content = completion.choices[0]?.message?.content;
-  if (!content) return EMPTY_RESULT;
+  if (!content) return { ...EMPTY_RESULT, ...usage };
 
   try {
     const parsed = JSON.parse(content) as AnalysisResult;
@@ -64,8 +82,9 @@ ${rawText}
       mentioned: Boolean(parsed.mentioned),
       rank: parsed.rank ?? null,
       competitors: Array.isArray(parsed.competitors) ? parsed.competitors : [],
+      ...usage,
     };
   } catch {
-    return { mentioned: rawText.includes(clientName), rank: null, competitors: [] };
+    return { mentioned: rawText.includes(clientName), rank: null, competitors: [], ...usage };
   }
 }

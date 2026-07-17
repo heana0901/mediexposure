@@ -2,7 +2,7 @@
 
 import type { Client } from "@/lib/types";
 
-export type Tab = "status" | "competitors";
+export type Tab = "status" | "competitors" | "trends" | "usage";
 
 type Props = {
   clients: Client[];
@@ -22,6 +22,8 @@ type Props = {
 const NAV_ITEMS: { key: Tab; label: string; icon: string }[] = [
   { key: "status", label: "AI노출현황", icon: "👁" },
   { key: "competitors", label: "경쟁병원분석", icon: "📈" },
+  { key: "trends", label: "추이 분석", icon: "📊" },
+  { key: "usage", label: "비용 현황", icon: "💳" },
 ];
 
 export function Sidebar({
@@ -41,8 +43,8 @@ export function Sidebar({
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
   return (
-    <aside className="w-72 shrink-0 border-r bg-white flex flex-col h-full">
-      <div className="p-5 border-b">
+    <aside className="w-72 shrink-0 border-r border-gray-100 bg-white flex flex-col h-full">
+      <div className="px-5 pt-5 pb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
             M
@@ -54,7 +56,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="p-4 border-b space-y-3">
+      <div className="px-4 pb-4 space-y-3">
         <button
           className="w-full text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
           onClick={onOpenCreateForm}
@@ -112,17 +114,22 @@ export function Sidebar({
         </button>
       </div>
 
-      <nav className="p-3 space-y-1">
+      <nav className="flex-1 px-3 pt-2 pb-3 space-y-0.5">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.key}
-            className={`w-full flex items-center gap-2 text-sm px-3 py-2 rounded-lg text-left ${
+            className={`w-full flex items-center gap-2.5 text-sm px-3 py-2 rounded-lg text-left transition-colors ${
               tab === item.key
-                ? "bg-blue-50 text-blue-600 font-medium"
-                : "text-gray-600 hover:bg-gray-50"
+                ? "text-blue-600 font-medium"
+                : "text-gray-500 hover:bg-gray-50"
             }`}
             onClick={() => onTabChange(item.key)}
           >
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                tab === item.key ? "bg-blue-600" : "bg-gray-300"
+              }`}
+            />
             <span>{item.icon}</span>
             {item.label}
           </button>

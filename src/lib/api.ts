@@ -1,4 +1,12 @@
-import type { Client, ClientInput, Keyword, MonitoringRun, MonitoringResult } from "./types";
+import type {
+  Client,
+  ClientInput,
+  Keyword,
+  MonitoringRun,
+  MonitoringResult,
+  TrendPoint,
+  UsageSummary,
+} from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -69,4 +77,13 @@ export const api = {
         totalResults: number;
       }>(r)
     ),
+
+  analyzeResult: (id: string) =>
+    fetch(`/api/results/${id}/analyze`, { method: "POST" }).then((r) => json<MonitoringResult>(r)),
+
+  getTrends: (clientId: string) =>
+    fetch(`/api/trends?clientId=${clientId}`).then((r) => json<TrendPoint[]>(r)),
+
+  getUsage: (clientId?: string) =>
+    fetch(`/api/usage${clientId ? `?clientId=${clientId}` : ""}`).then((r) => json<UsageSummary>(r)),
 };

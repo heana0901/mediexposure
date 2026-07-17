@@ -33,6 +33,11 @@ create table if not exists monitoring_results (
   rank int,
   raw_response text,
   competitors jsonb not null default '[]'::jsonb,
+  analysis_note text,
+  model text,
+  input_tokens int,
+  output_tokens int,
+  estimated_cost_usd numeric,
   created_at timestamptz not null default now()
 );
 
