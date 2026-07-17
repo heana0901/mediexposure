@@ -2,7 +2,7 @@ import { Dashboard } from "@/components/Dashboard";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 bg-gray-50">
+    <div className="flex flex-1">
       <Dashboard />
     </div>
   );

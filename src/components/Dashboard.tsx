@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Client, ClientInput, Keyword, MonitoringResult, MonitoringRun } from "@/lib/types";
-import { ClientPanel } from "./ClientPanel";
+import { Sidebar, type Tab } from "./Sidebar";
+import { KeywordManager } from "./KeywordManager";
+import { NewClientForm } from "./NewClientForm";
+import { Modal } from "./Modal";
 import { ExposureStatus } from "./ExposureStatus";
 import { CompetitorAnalysis } from "./CompetitorAnalysis";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
-type Tab = "status" | "competitors";
+const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
+  status: { title: "AI 노출현황", subtitle: "클라이언트별 AI 검색 노출도를 모니터링합니다" },
+  competitors: { title: "경쟁병원분석", subtitle: "미노출 항목과 경쟁병원 언급 빈도를 분석합니다" },
+};
 
 export function Dashboard() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -20,7 +26,9 @@ export function Dashboard() {
   const [results, setResults] = useState<ResultWithKeyword[]>([]);
   const [tab, setTab] = useState<Tab>("status");
   const [isRunning, setIsRunning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clientFormMode, setClientFormMode] = useState<"none" | "create" | "edit">("none");
 
   const [competitorData, setCompetitorData] = useState<{
     unexposed: ResultWithKeyword[];
@@ -73,15 +81,26 @@ export function Dashboard() {
     setSelectedClientId(client.id);
   }
 
-  async function handleUpdateClient(id: string, input: ClientInput) {
-    const updated = await api.updateClient(id, input);
-    setClients((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  async function handleUpdateClient(input: ClientInput) {
+    if (!selectedClientId) return;
+    const updated = await api.updateClient(selectedClientId, input);
+    setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
-  async function handleDeleteClient(id: string) {
-    await api.deleteClient(id);
-    setClients((prev) => prev.filter((c) => c.id !== id));
-    if (selectedClientId === id) setSelectedClientId(null);
+  async function handleDeleteClient() {
+    if (!selectedClient) return;
+    const confirmed = window.confirm(
+      `"${selectedClient.name}" 클라이언트를 삭제하시겠습니까?\n등록된 질문과 모니터링 기록이 모두 함께 삭제되며 되돌릴 수 없습니다.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await api.deleteClient(selectedClient.id);
+      setClients((prev) => prev.filter((c) => c.id !== selectedClient.id));
+      setSelectedClientId(null);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleAddKeyword(text: string) {
@@ -116,70 +135,88 @@ export function Dashboard() {
     }
   }
 
+  const { title, subtitle } = TAB_TITLE[tab];
+
   return (
-    <div className="max-w-5xl mx-auto w-full p-6">
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold">AI 노출현황</h1>
-        <p className="text-sm text-gray-500">클라이언트별 AI 검색 노출도를 모니터링합니다</p>
-      </div>
-
-      {error && (
-        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-          {error}
-        </div>
-      )}
-
-      <ClientPanel
+    <div className="flex flex-1 h-screen overflow-hidden bg-gray-50">
+      <Sidebar
         clients={clients}
         selectedClientId={selectedClientId}
         onSelectClient={setSelectedClientId}
-        onCreateClient={handleCreateClient}
-        onUpdateClient={handleUpdateClient}
+        onOpenCreateForm={() => setClientFormMode("create")}
+        onOpenEditForm={() => setClientFormMode("edit")}
         onDeleteClient={handleDeleteClient}
-        keywords={keywords}
-        onAddKeyword={handleAddKeyword}
-        onDeleteKeyword={handleDeleteKeyword}
+        deleting={deleting}
         onRunMonitoring={handleRunMonitoring}
         isRunning={isRunning}
+        canRun={!!selectedClientId && keywords.length > 0}
+        tab={tab}
+        onTabChange={setTab}
       />
 
-      {selectedClientId && (
-        <>
-          <div className="flex gap-4 border-b mb-4 text-sm font-medium">
-            <button
-              className={`pb-2 -mb-px border-b-2 ${
-                tab === "status" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400"
-              }`}
-              onClick={() => setTab("status")}
-            >
-              AI노출현황
-            </button>
-            <button
-              className={`pb-2 -mb-px border-b-2 ${
-                tab === "competitors" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400"
-              }`}
-              onClick={() => setTab("competitors")}
-            >
-              경쟁병원분석
-            </button>
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto w-full p-6">
+          <div className="mb-6">
+            <h1 className="text-lg font-semibold">{title}</h1>
+            <p className="text-sm text-gray-500">{subtitle}</p>
           </div>
 
-          {tab === "status" ? (
-            <ExposureStatus
-              clientName={selectedClient?.name ?? ""}
-              results={results}
-              runs={runs}
-              selectedRunId={selectedRunId}
-              onSelectRun={setSelectedRunId}
-            />
-          ) : (
-            <CompetitorAnalysis
-              unexposed={competitorData.unexposed}
-              competitorFrequency={competitorData.competitorFrequency}
-              totalResults={competitorData.totalResults}
-            />
+          {error && (
+            <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+              {error}
+            </div>
           )}
-        </>
+
+          {!selectedClientId ? (
+            <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
+              <div className="font-medium text-gray-600">클라이언트를 선택해주세요</div>
+              <div className="text-sm">왼쪽에서 클라이언트를 선택하거나 새로 추가하세요</div>
+            </div>
+          ) : (
+            <>
+              {tab === "status" && (
+                <>
+                  <KeywordManager
+                    keywords={keywords}
+                    onAddKeyword={handleAddKeyword}
+                    onDeleteKeyword={handleDeleteKeyword}
+                  />
+                  <ExposureStatus
+                    clientName={selectedClient?.name ?? ""}
+                    results={results}
+                    runs={runs}
+                    selectedRunId={selectedRunId}
+                    onSelectRun={setSelectedRunId}
+                  />
+                </>
+              )}
+
+              {tab === "competitors" && (
+                <CompetitorAnalysis
+                  unexposed={competitorData.unexposed}
+                  competitorFrequency={competitorData.competitorFrequency}
+                  totalResults={competitorData.totalResults}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </main>
+
+      {clientFormMode === "create" && (
+        <Modal onClose={() => setClientFormMode("none")}>
+          <NewClientForm onSubmit={handleCreateClient} onClose={() => setClientFormMode("none")} />
+        </Modal>
+      )}
+
+      {clientFormMode === "edit" && selectedClient && (
+        <Modal onClose={() => setClientFormMode("none")}>
+          <NewClientForm
+            client={selectedClient}
+            onSubmit={handleUpdateClient}
+            onClose={() => setClientFormMode("none")}
+          />
+        </Modal>
       )}
     </div>
   );
