@@ -17,6 +17,35 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 }
 
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((sum, v) => sum + v, 0) / values.length);
+}
+
+function monthLabel(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+}
+
+function computeMonthlyAverages(data: TrendPoint[]) {
+  const groups = new Map<string, TrendPoint[]>();
+  for (const point of data) {
+    const key = point.createdAt.slice(0, 7); // YYYY-MM
+    const list = groups.get(key) ?? [];
+    list.push(point);
+    groups.set(key, list);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, points]) => ({
+      key,
+      label: monthLabel(points[0].createdAt),
+      chatgptAvg: average(points.map((p) => p.chatgptRate).filter((v): v is number => v !== null)),
+      geminiAvg: average(points.map((p) => p.geminiRate).filter((v): v is number => v !== null)),
+    }));
+}
+
 function buildLine(
   points: (number | null)[],
   x: (i: number) => number,
@@ -41,11 +70,48 @@ function buildLine(
 export function TrendChart({ data }: Props) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  if (data.length < 2) {
+  if (data.length === 0) {
     return (
       <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
-        <div className="font-medium text-gray-600">추이를 보려면 2회 이상의 실행 기록이 필요합니다</div>
-        <div className="text-sm">모니터링을 몇 차례 더 실행해보세요</div>
+        <div className="font-medium text-gray-600">아직 모니터링 실행 기록이 없습니다</div>
+        <div className="text-sm">모니터링을 실행해보세요</div>
+      </div>
+    );
+  }
+
+  const monthlyAverages = computeMonthlyAverages(data);
+
+  const monthlySummary = (
+    <div className="border rounded-xl bg-white p-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">월별 평균 언급률</div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {monthlyAverages.map((m) => (
+          <div key={m.key} className="border rounded-lg p-3">
+            <div className="text-xs text-gray-500 mb-2">{m.label}</div>
+            <div className="flex gap-4 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
+                ChatGPT {m.chatgptAvg === null ? "-" : `${m.chatgptAvg}%`}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
+                Gemini {m.geminiAvg === null ? "-" : `${m.geminiAvg}%`}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (data.length < 2) {
+    return (
+      <div className="space-y-4">
+        {monthlySummary}
+        <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-16 text-gray-400">
+          <div className="font-medium text-gray-600">추이 그래프를 보려면 2회 이상의 실행 기록이 필요합니다</div>
+          <div className="text-sm">모니터링을 몇 차례 더 실행해보세요</div>
+        </div>
       </div>
     );
   }
@@ -71,7 +137,9 @@ export function TrendChart({ data }: Props) {
   const xTickEvery = Math.max(1, Math.ceil(data.length / 6));
 
   return (
-    <div className="border rounded-xl bg-white p-4">
+    <div className="space-y-4">
+      {monthlySummary}
+      <div className="border rounded-xl bg-white p-4">
       <div className="flex items-center gap-4 mb-3 text-xs text-gray-600">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: CHATGPT_COLOR }} />
@@ -182,6 +250,7 @@ export function TrendChart({ data }: Props) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

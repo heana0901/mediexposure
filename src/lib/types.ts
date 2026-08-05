@@ -48,6 +48,13 @@ export type MonitoringRun = {
   created_at: string;
 };
 
+export type SelfExposure = {
+  count: number;
+  total: number;
+  chatgpt: { count: number; total: number };
+  gemini: { count: number; total: number };
+};
+
 export type UsageSummary = {
   totalRuns: number;
   totalCostUsd: number;

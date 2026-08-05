@@ -6,6 +6,7 @@ import type {
   MonitoringResult,
   TrendPoint,
   UsageSummary,
+  SelfExposure,
 } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
@@ -75,6 +76,7 @@ export const api = {
         unexposed: (MonitoringResult & { keywords: { text: string } })[];
         competitorFrequency: { name: string; count: number }[];
         totalResults: number;
+        selfExposure: SelfExposure;
       }>(r)
     ),
 

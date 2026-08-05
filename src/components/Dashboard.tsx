@@ -10,6 +10,7 @@ import type {
   MonitoringRun,
   TrendPoint,
   UsageSummary,
+  SelfExposure,
 } from "@/lib/types";
 import { Sidebar, type Tab } from "./Sidebar";
 import { KeywordManager } from "./KeywordManager";
@@ -46,7 +47,13 @@ export function Dashboard() {
     unexposed: ResultWithKeyword[];
     competitorFrequency: { name: string; count: number }[];
     totalResults: number;
-  }>({ unexposed: [], competitorFrequency: [], totalResults: 0 });
+    selfExposure: SelfExposure;
+  }>({
+    unexposed: [],
+    competitorFrequency: [],
+    totalResults: 0,
+    selfExposure: { count: 0, total: 0, chatgpt: { count: 0, total: 0 }, gemini: { count: 0, total: 0 } },
+  });
 
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [usage, setUsage] = useState<UsageSummary>({ totalRuns: 0, totalCostUsd: 0, byClient: [] });
@@ -220,9 +227,11 @@ export function Dashboard() {
 
               {tab === "competitors" && (
                 <CompetitorAnalysis
+                  clientName={selectedClient?.name ?? ""}
                   unexposed={competitorData.unexposed}
                   competitorFrequency={competitorData.competitorFrequency}
                   totalResults={competitorData.totalResults}
+                  selfExposure={competitorData.selfExposure}
                 />
               )}
 

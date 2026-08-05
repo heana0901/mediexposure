@@ -48,9 +48,25 @@ export async function GET(request: Request) {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
+  const selfMentionCount = allResults.filter((r) => r.mentioned).length;
+  const chatgptResults = allResults.filter((r) => r.provider === "chatgpt");
+  const geminiResults = allResults.filter((r) => r.provider === "gemini");
+
   return NextResponse.json({
     unexposed,
     competitorFrequency,
     totalResults: allResults.length,
+    selfExposure: {
+      count: selfMentionCount,
+      total: allResults.length,
+      chatgpt: {
+        count: chatgptResults.filter((r) => r.mentioned).length,
+        total: chatgptResults.length,
+      },
+      gemini: {
+        count: geminiResults.filter((r) => r.mentioned).length,
+        total: geminiResults.length,
+      },
+    },
   });
 }

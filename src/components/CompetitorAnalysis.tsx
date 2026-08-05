@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MonitoringResult, Provider } from "@/lib/types";
+import type { MonitoringResult, Provider, SelfExposure } from "@/lib/types";
 import { api } from "@/lib/api";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
@@ -12,9 +12,11 @@ const PROVIDER_LABEL: Record<Provider, string> = {
 };
 
 type Props = {
+  clientName: string;
   unexposed: ResultWithKeyword[];
   competitorFrequency: { name: string; count: number }[];
   totalResults: number;
+  selfExposure: SelfExposure;
 };
 
 function UnexposedCard({ result }: { result: ResultWithKeyword }) {
@@ -69,7 +71,15 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
   );
 }
 
-export function CompetitorAnalysis({ unexposed, competitorFrequency, totalResults }: Props) {
+export function CompetitorAnalysis({
+  clientName,
+  unexposed,
+  competitorFrequency,
+  totalResults,
+  selfExposure,
+}: Props) {
+  const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
+
   return (
     <div className="grid md:grid-cols-2 gap-6">
       <div className="border rounded-xl bg-white p-4">
@@ -89,27 +99,48 @@ export function CompetitorAnalysis({ unexposed, competitorFrequency, totalResult
         )}
       </div>
 
-      <div className="border rounded-xl bg-white p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="font-medium text-sm text-gray-700">📈 경쟁병원 노출 빈도</span>
-          <span className="text-xs text-gray-400">전체 {totalResults}건 기준</span>
+      <div className="space-y-6">
+        <div className="border rounded-xl bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium text-sm text-gray-700">🏥 {clientName} 노출 빈도</span>
+            <span className="text-xs text-gray-400">전체 {selfExposure.total}건 기준</span>
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl font-semibold text-blue-600">{selfExposure.count}회</span>
+            <span className="text-sm text-gray-400">({selfRate}%)</span>
+          </div>
+          <div className="flex gap-4 text-xs text-gray-500">
+            <span>
+              ChatGPT {selfExposure.chatgpt.count}/{selfExposure.chatgpt.total}회
+            </span>
+            <span>
+              Gemini {selfExposure.gemini.count}/{selfExposure.gemini.total}회
+            </span>
+          </div>
         </div>
 
-        {competitorFrequency.length === 0 ? (
-          <div className="text-sm text-gray-400 py-8 text-center">데이터가 없습니다</div>
-        ) : (
-          <ol className="space-y-2">
-            {competitorFrequency.slice(0, 10).map((c, i) => (
-              <li key={c.name} className="flex items-center gap-3 text-sm">
-                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs">
-                  {i + 1}
-                </span>
-                <span className="flex-1 text-gray-700">{c.name}</span>
-                <span className="text-gray-400">{c.count}회</span>
-              </li>
-            ))}
-          </ol>
-        )}
+        <div className="border rounded-xl bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium text-sm text-gray-700">📈 경쟁병원 노출 빈도</span>
+            <span className="text-xs text-gray-400">전체 {totalResults}건 기준</span>
+          </div>
+
+          {competitorFrequency.length === 0 ? (
+            <div className="text-sm text-gray-400 py-8 text-center">데이터가 없습니다</div>
+          ) : (
+            <ol className="space-y-2">
+              {competitorFrequency.slice(0, 10).map((c, i) => (
+                <li key={c.name} className="flex items-center gap-3 text-sm">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs">
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 text-gray-700">{c.name}</span>
+                  <span className="text-gray-400">{c.count}회</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
     </div>
   );
