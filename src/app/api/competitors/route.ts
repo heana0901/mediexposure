@@ -37,16 +37,24 @@ export async function GET(request: Request) {
 
   const unexposed = allResults.filter((r) => !r.mentioned);
 
-  const frequency = new Map<string, number>();
+  const frequency = new Map<string, { chatgpt: number; gemini: number }>();
   for (const r of allResults) {
     for (const name of (r.competitors as string[] | null) ?? []) {
-      frequency.set(name, (frequency.get(name) ?? 0) + 1);
+      const entry = frequency.get(name) ?? { chatgpt: 0, gemini: 0 };
+      if (r.provider === "chatgpt") entry.chatgpt += 1;
+      else entry.gemini += 1;
+      frequency.set(name, entry);
     }
   }
 
   const competitorFrequency = Array.from(frequency.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+    .map(([name, counts]) => ({
+      name,
+      chatgpt: counts.chatgpt,
+      gemini: counts.gemini,
+      total: counts.chatgpt + counts.gemini,
+    }))
+    .sort((a, b) => b.total - a.total);
 
   const selfMentionCount = allResults.filter((r) => r.mentioned).length;
   const chatgptResults = allResults.filter((r) => r.provider === "chatgpt");

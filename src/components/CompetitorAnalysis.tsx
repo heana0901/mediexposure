@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MonitoringResult, Provider, SelfExposure } from "@/lib/types";
+import type { CompetitorFrequencyEntry, MonitoringResult, Provider, SelfExposure } from "@/lib/types";
 import { api } from "@/lib/api";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
@@ -11,10 +11,13 @@ const PROVIDER_LABEL: Record<Provider, string> = {
   gemini: "Gemini",
 };
 
+const CHATGPT_COLOR = "#2a78d6";
+const GEMINI_COLOR = "#1baf7a";
+
 type Props = {
   clientName: string;
   unexposed: ResultWithKeyword[];
-  competitorFrequency: { name: string; count: number }[];
+  competitorFrequency: CompetitorFrequencyEntry[];
   totalResults: number;
   selfExposure: SelfExposure;
 };
@@ -131,11 +134,21 @@ export function CompetitorAnalysis({
             <ol className="space-y-2">
               {competitorFrequency.slice(0, 10).map((c, i) => (
                 <li key={c.name} className="flex items-center gap-3 text-sm">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs shrink-0">
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-gray-700">{c.name}</span>
-                  <span className="text-gray-400">{c.count}회</span>
+                  <span className="flex-1 text-gray-700 truncate">{c.name}</span>
+                  <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
+                      {c.chatgpt}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
+                      {c.gemini}
+                    </span>
+                    <span className="text-gray-400">총 {c.total}회</span>
+                  </span>
                 </li>
               ))}
             </ol>

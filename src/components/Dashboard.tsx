@@ -11,6 +11,7 @@ import type {
   TrendPoint,
   UsageSummary,
   SelfExposure,
+  CompetitorFrequencyEntry,
 } from "@/lib/types";
 import { Sidebar, type Tab } from "./Sidebar";
 import { KeywordManager } from "./KeywordManager";
@@ -45,7 +46,7 @@ export function Dashboard() {
 
   const [competitorData, setCompetitorData] = useState<{
     unexposed: ResultWithKeyword[];
-    competitorFrequency: { name: string; count: number }[];
+    competitorFrequency: CompetitorFrequencyEntry[];
     totalResults: number;
     selfExposure: SelfExposure;
   }>({
