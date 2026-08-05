@@ -22,12 +22,7 @@ function average(values: number[]): number | null {
   return Math.round(values.reduce((sum, v) => sum + v, 0) / values.length);
 }
 
-function monthLabel(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
-}
-
-function computeMonthlyAverages(data: TrendPoint[]) {
+function computeMonthlyTable(data: TrendPoint[]) {
   const groups = new Map<string, TrendPoint[]>();
   for (const point of data) {
     const key = point.createdAt.slice(0, 7); // YYYY-MM
@@ -36,14 +31,24 @@ function computeMonthlyAverages(data: TrendPoint[]) {
     groups.set(key, list);
   }
 
-  return Array.from(groups.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, points]) => ({
-      key,
-      label: monthLabel(points[0].createdAt),
-      chatgptAvg: average(points.map((p) => p.chatgptRate).filter((v): v is number => v !== null)),
-      geminiAvg: average(points.map((p) => p.geminiRate).filter((v): v is number => v !== null)),
-    }));
+  const years =
+    data.length > 0
+      ? Array.from(new Set(data.map((p) => Number(p.createdAt.slice(0, 4))))).sort()
+      : [new Date().getFullYear()];
+
+  return years.map((year) => ({
+    year,
+    months: Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      const key = `${year}-${String(month).padStart(2, "0")}`;
+      const points = groups.get(key) ?? [];
+      return {
+        month,
+        chatgptAvg: average(points.map((p) => p.chatgptRate).filter((v): v is number => v !== null)),
+        geminiAvg: average(points.map((p) => p.geminiRate).filter((v): v is number => v !== null)),
+      };
+    }),
+  }));
 }
 
 function buildLine(
@@ -79,28 +84,60 @@ export function TrendChart({ data }: Props) {
     );
   }
 
-  const monthlyAverages = computeMonthlyAverages(data);
+  const monthlyTable = computeMonthlyTable(data);
 
   const monthlySummary = (
-    <div className="border rounded-xl bg-white p-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">월별 평균 언급률</div>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {monthlyAverages.map((m) => (
-          <div key={m.key} className="border rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-2">{m.label}</div>
-            <div className="flex gap-4 text-sm">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
-                ChatGPT {m.chatgptAvg === null ? "-" : `${m.chatgptAvg}%`}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
-                Gemini {m.geminiAvg === null ? "-" : `${m.geminiAvg}%`}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="border rounded-xl bg-white p-4 space-y-4">
+      <div className="text-sm font-medium text-gray-700">월별 평균 언급률</div>
+      {monthlyTable.map(({ year, months }) => (
+        <div key={year} className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left text-xs font-normal text-gray-400 py-1.5 pr-3 whitespace-nowrap">
+                  {year}년
+                </th>
+                {months.map((m) => (
+                  <th
+                    key={m.month}
+                    className="text-center text-xs font-normal text-gray-400 py-1.5 px-2 whitespace-nowrap"
+                  >
+                    {m.month}월
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t">
+                <td className="py-1.5 pr-3 whitespace-nowrap">
+                  <span className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CHATGPT_COLOR }} />
+                    ChatGPT
+                  </span>
+                </td>
+                {months.map((m) => (
+                  <td key={m.month} className="text-center py-1.5 px-2 text-gray-700">
+                    {m.chatgptAvg === null ? <span className="text-gray-300">-</span> : `${m.chatgptAvg}%`}
+                  </td>
+                ))}
+              </tr>
+              <tr className="border-t">
+                <td className="py-1.5 pr-3 whitespace-nowrap">
+                  <span className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: GEMINI_COLOR }} />
+                    Gemini
+                  </span>
+                </td>
+                {months.map((m) => (
+                  <td key={m.month} className="text-center py-1.5 px-2 text-gray-700">
+                    {m.geminiAvg === null ? <span className="text-gray-300">-</span> : `${m.geminiAvg}%`}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 
