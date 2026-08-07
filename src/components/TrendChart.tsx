@@ -108,7 +108,7 @@ export function TrendChart({ data }: Props) {
               </tr>
             </thead>
             <tbody>
-              <tr className="border-t">
+              <tr className="border-t border-gray-100">
                 <td className="py-1.5 pr-3 whitespace-nowrap">
                   <span className="flex items-center gap-1.5 text-xs text-gray-600">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CHATGPT_COLOR }} />
@@ -121,7 +121,7 @@ export function TrendChart({ data }: Props) {
                   </td>
                 ))}
               </tr>
-              <tr className="border-t">
+              <tr className="border-t border-gray-100">
                 <td className="py-1.5 pr-3 whitespace-nowrap">
                   <span className="flex items-center gap-1.5 text-xs text-gray-600">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: GEMINI_COLOR }} />
@@ -277,7 +277,7 @@ export function TrendChart({ data }: Props) {
       </svg>
 
       {hoverIndex !== null && (
-        <div className="text-xs text-gray-600 border-t pt-2 mt-1">
+        <div className="text-xs text-gray-600 border-t border-gray-100 pt-2 mt-1">
           <span className="font-medium">{formatDate(data[hoverIndex].createdAt)}</span>
           {data[hoverIndex].chatgptRate !== null && (
             <span className="ml-3">ChatGPT {data[hoverIndex].chatgptRate}%</span>
