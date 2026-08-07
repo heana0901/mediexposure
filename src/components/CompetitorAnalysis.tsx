@@ -42,10 +42,15 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
   }
 
   return (
-    <div className="border rounded-lg p-3">
+    <div className="border border-gray-100 rounded-lg p-3">
       <div className="flex items-center justify-between gap-2 mb-2 text-sm">
         <div className="flex items-center gap-2">
-          <span className="text-green-600 font-medium">{PROVIDER_LABEL[result.provider]}</span>
+          <span
+            className="font-medium"
+            style={{ color: result.provider === "chatgpt" ? CHATGPT_COLOR : GEMINI_COLOR }}
+          >
+            {PROVIDER_LABEL[result.provider]}
+          </span>
           <span className="text-gray-700">{result.keywords.text}</span>
         </div>
         {!note && (
@@ -86,7 +91,7 @@ export function CompetitorAnalysis({
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      <div className="border rounded-xl bg-white p-4">
+      <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
             <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -109,7 +114,7 @@ export function CompetitorAnalysis({
       </div>
 
       <div className="space-y-6">
-        <div className="border rounded-xl bg-white p-4">
+        <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
               <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -133,7 +138,7 @@ export function CompetitorAnalysis({
           </div>
         </div>
 
-        <div className="border rounded-xl bg-white p-4">
+        <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
               <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">

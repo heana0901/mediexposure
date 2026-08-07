@@ -56,7 +56,7 @@ function NewUserForm({
   }
 
   return (
-    <div className="border rounded-xl bg-white p-4 space-y-3">
+    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">새 계정 추가</span>
         <button className="text-gray-400 hover:text-gray-600 text-sm" onClick={onClose}>
@@ -68,7 +68,7 @@ function NewUserForm({
         <label className="flex flex-col gap-1 text-xs text-gray-500">
           아이디
           <input
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
@@ -77,7 +77,7 @@ function NewUserForm({
           비밀번호
           <input
             type="password"
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -183,7 +183,7 @@ export function AccountManagement({ clients, currentUsername }: Props) {
         />
       )}
 
-      <div className="border rounded-xl bg-white p-4">
+      <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
         {loading ? (
           <div className="text-sm text-gray-400 py-8 text-center">불러오는 중...</div>
         ) : users.length === 0 ? (
@@ -200,7 +200,7 @@ export function AccountManagement({ clients, currentUsername }: Props) {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b last:border-0">
+                <tr key={u.id} className="border-b border-gray-100 last:border-0">
                   <td className="py-2.5 text-gray-700">
                     {u.username}
                     {u.username === currentUsername && (

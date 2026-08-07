@@ -77,7 +77,7 @@ export function TrendChart({ data }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
+      <div className="border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center justify-center py-20 text-gray-400">
         <div className="font-medium text-gray-600">아직 모니터링 실행 기록이 없습니다</div>
         <div className="text-sm">모니터링을 실행해보세요</div>
       </div>
@@ -87,7 +87,7 @@ export function TrendChart({ data }: Props) {
   const monthlyTable = computeMonthlyTable(data);
 
   const monthlySummary = (
-    <div className="border rounded-xl bg-white p-4 space-y-4">
+    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 space-y-4">
       <div className="text-sm font-medium text-gray-700">월별 평균 언급률</div>
       {monthlyTable.map(({ year, months }) => (
         <div key={year} className="overflow-x-auto">
@@ -145,7 +145,7 @@ export function TrendChart({ data }: Props) {
     return (
       <div className="space-y-4">
         {monthlySummary}
-        <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-16 text-gray-400">
+        <div className="border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center justify-center py-16 text-gray-400">
           <div className="font-medium text-gray-600">추이 그래프를 보려면 2회 이상의 실행 기록이 필요합니다</div>
           <div className="text-sm">모니터링을 몇 차례 더 실행해보세요</div>
         </div>
@@ -176,7 +176,7 @@ export function TrendChart({ data }: Props) {
   return (
     <div className="space-y-4">
       {monthlySummary}
-      <div className="border rounded-xl bg-white p-4">
+      <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
       <div className="flex items-center gap-4 mb-3 text-xs text-gray-600">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: CHATGPT_COLOR }} />

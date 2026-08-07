@@ -216,7 +216,7 @@ export function Dashboard() {
           ) : tab === "accounts" ? (
             <AccountManagement clients={clients} currentUsername={me?.username ?? null} />
           ) : !selectedClientId ? (
-            <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
+            <div className="border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="font-medium text-gray-600">클라이언트를 선택해주세요</div>
               <div className="text-sm">왼쪽에서 클라이언트를 선택하거나 새로 추가하세요</div>
             </div>

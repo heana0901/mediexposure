@@ -63,8 +63,8 @@ function KeywordCard({
   const active = results.find((r) => r.provider === activeProvider) ?? results[0];
 
   return (
-    <div className="border rounded-xl bg-white overflow-hidden">
-      <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+    <div className="border border-gray-100 rounded-xl bg-white overflow-hidden shadow-sm">
+      <div className="p-4 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
         <span className="font-medium text-sm text-gray-800">{keywordText}</span>
         <span className="text-xs text-gray-500">
           전체 언급률 <b className="text-gray-800">{overallRate}%</b> ({mentionedCount}/
@@ -79,8 +79,8 @@ function KeywordCard({
             onClick={() => setActiveProvider(r.provider)}
             className={`text-left border rounded-lg p-3 transition ${
               activeProvider === r.provider
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
+                ? "border-blue-400 bg-blue-50"
+                : "border-gray-100 hover:border-gray-200"
             }`}
           >
             <div className="text-sm text-gray-600">{PROVIDER_LABEL[r.provider]}</div>
@@ -100,7 +100,7 @@ function KeywordCard({
         <div className="text-xs text-gray-500 mb-2">
           {PROVIDER_LABEL[active.provider]} 응답 결과
         </div>
-        <div className="border rounded-lg p-3 max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap bg-gray-50">
+        <div className="border border-gray-100 rounded-lg p-3 max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap bg-gray-50/60">
           {active.raw_response ? highlight(active.raw_response, clientName) : "응답 없음"}
         </div>
         {active.competitors.length > 0 && (
@@ -147,7 +147,7 @@ export function ExposureStatus({ clientName, results, runs, selectedRunId, onSel
     <div className="space-y-4">
       {runs.length > 0 && (
         <select
-          className="border rounded-lg px-3 py-2 text-sm"
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
           value={selectedRunId ?? ""}
           onChange={(e) => onSelectRun(e.target.value)}
         >
@@ -161,7 +161,7 @@ export function ExposureStatus({ clientName, results, runs, selectedRunId, onSel
       )}
 
       {groups.length === 0 ? (
-        <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
+        <div className="border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center justify-center py-20 text-gray-400">
           <div className="w-12 h-12 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center mb-3">
             <IconEye className="w-6 h-6" />
           </div>

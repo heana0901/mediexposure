@@ -47,7 +47,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
   }
 
   return (
-    <div className="w-full border rounded-xl bg-white p-4 space-y-3">
+    <div className="w-full border border-gray-100 rounded-xl bg-white shadow-sm p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">
           {isEdit ? "클라이언트 정보 수정" : "새 클라이언트 추가"}
@@ -61,7 +61,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         <label className="flex flex-col gap-1 text-xs text-gray-500">
           병원명 *
           <input
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="예: 서울항외과"
@@ -71,7 +71,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         <label className="flex flex-col gap-1 text-xs text-gray-500">
           지역
           <input
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
             placeholder="예: 서울 강남구"
@@ -81,7 +81,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         <label className="flex flex-col gap-1 text-xs text-gray-500">
           진료과목
           <input
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
             placeholder="예: 대장항문외과"
@@ -91,7 +91,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         <label className="flex flex-col gap-1 text-xs text-gray-500">
           대표원장
           <input
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={directorName}
             onChange={(e) => setDirectorName(e.target.value)}
             placeholder="예: 홍길동"
@@ -101,7 +101,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
           전문의 여부
           <select
-            className="border rounded-lg px-3 py-2 text-sm text-gray-900"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={isSpecialist}
             onChange={(e) => setIsSpecialist(e.target.value as "unknown" | "yes" | "no")}
           >

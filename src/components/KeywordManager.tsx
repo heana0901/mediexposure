@@ -20,7 +20,7 @@ export function KeywordManager({ keywords, onAddKeyword, onDeleteKeyword }: Prop
   }
 
   return (
-    <div className="w-full border rounded-xl bg-white p-4 mb-4">
+    <div className="w-full border border-gray-100 rounded-xl bg-white shadow-sm p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-gray-700">모니터링 질문</span>
         <span className="text-xs text-gray-400">{keywords.length}개</span>
@@ -48,7 +48,7 @@ export function KeywordManager({ keywords, onAddKeyword, onDeleteKeyword }: Prop
 
       <div className="flex gap-2">
         <input
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
           placeholder="질문 입력 후 Enter"
           value={newKeyword}
           onChange={(e) => setNewKeyword(e.target.value)}
