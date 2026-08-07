@@ -47,6 +47,7 @@ create table if not exists app_users (
   username text not null unique,
   password_hash text not null,
   is_admin boolean not null default false,
+  email text,
   created_at timestamptz not null default now()
 );
 

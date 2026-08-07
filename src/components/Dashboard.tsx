@@ -45,6 +45,8 @@ export function Dashboard() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientFormMode, setClientFormMode] = useState<"none" | "create" | "edit">("none");
+  const [sendingReport, setSendingReport] = useState(false);
+  const [reportMessage, setReportMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   const [competitorData, setCompetitorData] = useState<{
     unexposed: ResultWithKeyword[];
@@ -178,6 +180,20 @@ export function Dashboard() {
     }
   }
 
+  async function handleSendReport() {
+    if (!selectedClientId) return;
+    setSendingReport(true);
+    setReportMessage(null);
+    try {
+      const res = await api.sendReport(selectedClientId);
+      setReportMessage({ type: "ok", text: `${res.sentTo}로 리포트를 발송했습니다.` });
+    } catch (e) {
+      setReportMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSendingReport(false);
+    }
+  }
+
   const { title, subtitle } = TAB_TITLE[tab];
 
   return (
@@ -200,9 +216,28 @@ export function Dashboard() {
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto w-full p-6">
-          <div className="mb-6">
-            <h1 className="text-lg font-semibold">{title}</h1>
-            <p className="text-sm text-gray-500">{subtitle}</p>
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-lg font-semibold">{title}</h1>
+              <p className="text-sm text-gray-500">{subtitle}</p>
+            </div>
+
+            {selectedClientId && tab !== "usage" && tab !== "accounts" && (
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <button
+                  className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+                  disabled={sendingReport}
+                  onClick={handleSendReport}
+                >
+                  {sendingReport ? "발송 중..." : "📧 리포트 발송"}
+                </button>
+                {reportMessage && (
+                  <span className={`text-xs ${reportMessage.type === "ok" ? "text-green-600" : "text-red-500"}`}>
+                    {reportMessage.text}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (

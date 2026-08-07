@@ -20,6 +20,7 @@ function NewUserForm({
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -39,11 +40,13 @@ function NewUserForm({
         password,
         isAdmin,
         clientIds,
+        email: email.trim() || undefined,
       });
       onCreated({
         id: created.id,
         username: created.username,
         isAdmin: created.isAdmin,
+        email: created.email,
         createdAt: new Date().toISOString(),
         clients: clients.filter((c) => clientIds.includes(c.id)),
       });
@@ -80,6 +83,16 @@ function NewUserForm({
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
+          이메일 (리포트 발송용, 선택)
+          <input
+            type="email"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="예: hospital@example.com"
           />
         </label>
       </div>
@@ -124,6 +137,66 @@ function NewUserForm({
       >
         {saving ? "추가 중..." : "추가"}
       </button>
+    </div>
+  );
+}
+
+function EmailCell({ user, onSaved }: { user: AppUser; onSaved: (email: string | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(user.email ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await api.updateUserEmail(user.id, value.trim());
+      onSaved(updated.email);
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        className="text-xs text-left hover:underline"
+        onClick={() => setEditing(true)}
+      >
+        {user.email ? (
+          <span className="text-gray-600">{user.email}</span>
+        ) : (
+          <span className="text-gray-300">미등록</span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="email"
+        autoFocus
+        className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 w-40"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="hospital@example.com"
+      />
+      <button
+        className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50"
+        disabled={saving}
+        onClick={handleSave}
+      >
+        저장
+      </button>
+      <button className="text-xs text-gray-400 hover:text-gray-600" onClick={() => setEditing(false)}>
+        취소
+      </button>
+      {error && <span className="text-xs text-red-500">{error}</span>}
     </div>
   );
 }
@@ -194,6 +267,7 @@ export function AccountManagement({ clients, currentUsername }: Props) {
               <tr className="text-left text-xs text-gray-400 border-b">
                 <th className="py-2 font-normal">아이디</th>
                 <th className="py-2 font-normal">권한</th>
+                <th className="py-2 font-normal">이메일</th>
                 <th className="py-2 font-normal">접근 가능 클라이언트</th>
                 <th className="py-2 font-normal text-right">관리</th>
               </tr>
@@ -215,6 +289,14 @@ export function AccountManagement({ clients, currentUsername }: Props) {
                     ) : (
                       <span className="text-xs text-gray-500">일반</span>
                     )}
+                  </td>
+                  <td className="py-2.5">
+                    <EmailCell
+                      user={u}
+                      onSaved={(email) =>
+                        setUsers((prev) => prev.map((p) => (p.id === u.id ? { ...p, email } : p)))
+                      }
+                    />
                   </td>
                   <td className="py-2.5">
                     {u.isAdmin ? (

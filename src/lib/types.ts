@@ -83,6 +83,7 @@ export type AppUser = {
   id: string;
   username: string;
   isAdmin: boolean;
+  email: string | null;
   createdAt: string;
   clients: { id: string; name: string }[];
 };
@@ -92,4 +93,5 @@ export type AppUserInput = {
   password: string;
   isAdmin: boolean;
   clientIds: string[];
+  email?: string;
 };
