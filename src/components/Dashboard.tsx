@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
 import { api } from "@/lib/api";
 import type {
   Client,
@@ -22,6 +23,7 @@ import { CompetitorAnalysis } from "./CompetitorAnalysis";
 import { TrendChart } from "./TrendChart";
 import { UsageDashboard } from "./UsageDashboard";
 import { AccountManagement } from "./AccountManagement";
+import { ReportPrintView } from "./ReportPrintView";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
@@ -47,6 +49,7 @@ export function Dashboard() {
   const [clientFormMode, setClientFormMode] = useState<"none" | "create" | "edit">("none");
   const [sendingReport, setSendingReport] = useState(false);
   const [reportMessage, setReportMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const [competitorData, setCompetitorData] = useState<{
     unexposed: ResultWithKeyword[];
@@ -154,6 +157,12 @@ export function Dashboard() {
     setKeywords((prev) => [...prev, keyword]);
   }
 
+  async function handleAddKeywordsBulk(texts: string[]) {
+    if (!selectedClientId) return;
+    const added = await api.addKeywordsBulk(selectedClientId, texts);
+    setKeywords((prev) => [...prev, ...added]);
+  }
+
   async function handleDeleteKeyword(id: string) {
     await api.deleteKeyword(id);
     setKeywords((prev) => prev.filter((k) => k.id !== id));
@@ -194,6 +203,58 @@ export function Dashboard() {
     }
   }
 
+  async function handleDownloadPdf() {
+    if (!selectedClientId || !selectedClient) return;
+    setDownloadingPdf(true);
+    setReportMessage(null);
+
+    const host = document.createElement("div");
+    host.style.position = "fixed";
+    host.style.left = "-99999px";
+    host.style.top = "0";
+    document.body.appendChild(host);
+    const root = createRoot(host);
+
+    try {
+      const data = await api.getReportData(selectedClientId);
+      root.render(<ReportPrintView data={data} />);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const canvas = await html2canvas(host.firstElementChild as HTMLElement, { scale: 2 });
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${selectedClient.name}_주간리포트.pdf`);
+    } catch (e) {
+      setReportMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      root.unmount();
+      document.body.removeChild(host);
+      setDownloadingPdf(false);
+    }
+  }
+
   const { title, subtitle } = TAB_TITLE[tab];
 
   return (
@@ -224,13 +285,22 @@ export function Dashboard() {
 
             {selectedClientId && tab !== "usage" && tab !== "accounts" && (
               <div className="flex flex-col items-end gap-1.5 shrink-0">
-                <button
-                  className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
-                  disabled={sendingReport}
-                  onClick={handleSendReport}
-                >
-                  {sendingReport ? "발송 중..." : "📧 리포트 발송"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+                    disabled={downloadingPdf}
+                    onClick={handleDownloadPdf}
+                  >
+                    {downloadingPdf ? "생성 중..." : "📄 PDF 다운로드"}
+                  </button>
+                  <button
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+                    disabled={sendingReport}
+                    onClick={handleSendReport}
+                  >
+                    {sendingReport ? "발송 중..." : "📧 리포트 발송"}
+                  </button>
+                </div>
                 {reportMessage && (
                   <span className={`text-xs ${reportMessage.type === "ok" ? "text-green-600" : "text-red-500"}`}>
                     {reportMessage.text}
@@ -262,6 +332,7 @@ export function Dashboard() {
                   <KeywordManager
                     keywords={keywords}
                     onAddKeyword={handleAddKeyword}
+                    onAddKeywordsBulk={handleAddKeywordsBulk}
                     onDeleteKeyword={handleDeleteKeyword}
                   />
                   <ExposureStatus

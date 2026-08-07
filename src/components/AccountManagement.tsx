@@ -217,6 +217,119 @@ function ClientAccessCell({
   );
 }
 
+const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function AutoReportRow({ client, onSaved }: { client: Client; onSaved: (client: Client) => void }) {
+  const [enabled, setEnabled] = useState(client.auto_report_enabled);
+  const [day, setDay] = useState<number>(client.auto_report_day ?? 1);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const dirty = enabled !== client.auto_report_enabled || (enabled && day !== client.auto_report_day);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateAutoReport(client.id, enabled, enabled ? day : null);
+      onSaved({ ...client, auto_report_enabled: enabled, auto_report_day: enabled ? day : null });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className="border-b border-gray-100 last:border-0">
+      <td className="py-2.5 text-gray-700">{client.name}</td>
+      <td className="py-2.5 text-xs text-gray-500">
+        {client.contact_email ?? <span className="text-gray-300">미등록</span>}
+      </td>
+      <td className="py-2.5">
+        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          자동 발송
+        </label>
+      </td>
+      <td className="py-2.5">
+        <select
+          className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 disabled:opacity-40 disabled:bg-gray-50"
+          disabled={!enabled}
+          value={day}
+          onChange={(e) => setDay(Number(e.target.value))}
+        >
+          {DAY_LABELS.map((label, i) => (
+            <option key={i} value={i}>
+              매주 {label}요일
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="py-2.5 text-right">
+        {enabled && !client.contact_email && (
+          <span className="text-xs text-amber-600 mr-2">수신 이메일 필요</span>
+        )}
+        {error && <span className="text-xs text-red-500 mr-2">{error}</span>}
+        {saved && <span className="text-xs text-green-600 mr-2">저장됨</span>}
+        <button
+          className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
+          disabled={!dirty || saving || (enabled && !client.contact_email)}
+          onClick={handleSave}
+        >
+          {saving ? "저장 중..." : "저장"}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function AutoReportSchedule({ clients }: { clients: Client[] }) {
+  const [localClients, setLocalClients] = useState(clients);
+  const [syncedClients, setSyncedClients] = useState(clients);
+
+  if (clients !== syncedClients) {
+    setSyncedClients(clients);
+    setLocalClients(clients);
+  }
+
+  if (localClients.length === 0) return null;
+
+  return (
+    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+      <div className="text-sm font-medium text-gray-700 mb-1">주간 리포트 자동 발송 예약</div>
+      <div className="text-xs text-gray-400 mb-3">
+        매일 정기 모니터링(낮 12시) 후, 선택한 요일에 해당 병원의 수신 이메일로 리포트를 자동 발송합니다.
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-gray-400 border-b">
+            <th className="py-2 font-normal">병원명</th>
+            <th className="py-2 font-normal">수신 이메일</th>
+            <th className="py-2 font-normal">사용 여부</th>
+            <th className="py-2 font-normal">발송 요일</th>
+            <th className="py-2 font-normal text-right">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          {localClients.map((c) => (
+            <AutoReportRow
+              key={c.id}
+              client={c}
+              onSaved={(updated) =>
+                setLocalClients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+              }
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function AccountManagement({ clients, currentUsername }: Props) {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,6 +450,8 @@ export function AccountManagement({ clients, currentUsername }: Props) {
           </table>
         )}
       </div>
+
+      <AutoReportSchedule clients={clients} />
     </div>
   );
 }

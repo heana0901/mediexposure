@@ -9,6 +9,8 @@ create table if not exists clients (
   director_name text,
   is_specialist boolean,
   contact_email text,
+  auto_report_enabled boolean not null default false,
+  auto_report_day smallint,
   created_at timestamptz not null default now()
 );
 

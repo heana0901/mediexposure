@@ -11,6 +11,7 @@ import type {
   AppUser,
   AppUserInput,
 } from "./types";
+import type { ClientReportData } from "./reportData";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -56,6 +57,13 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     }).then((r) => json<Keyword>(r)),
+
+  addKeywordsBulk: (clientId: string, texts: string[]) =>
+    fetch(`/api/clients/${clientId}/keywords`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texts }),
+    }).then((r) => json<Keyword[]>(r)),
 
   deleteKeyword: (id: string) =>
     fetch(`/api/keywords/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
@@ -124,4 +132,14 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
     }).then((r) => json<{ ok: true; sentTo: string }>(r)),
+
+  getReportData: (clientId: string) =>
+    fetch(`/api/reports/data?clientId=${clientId}`).then((r) => json<ClientReportData>(r)),
+
+  updateAutoReport: (clientId: string, enabled: boolean, day: number | null) =>
+    fetch(`/api/clients/${clientId}/auto-report`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled, day }),
+    }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
 };
