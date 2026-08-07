@@ -8,6 +8,8 @@ import type {
   UsageSummary,
   SelfExposure,
   CompetitorFrequencyEntry,
+  AppUser,
+  AppUserInput,
 } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
@@ -96,4 +98,16 @@ export const api = {
 
   getUsage: (clientId?: string) =>
     fetch(`/api/usage${clientId ? `?clientId=${clientId}` : ""}`).then((r) => json<UsageSummary>(r)),
+
+  listUsers: () => fetch("/api/admin/users").then((r) => json<AppUser[]>(r)),
+
+  createUser: (input: AppUserInput) =>
+    fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }).then((r) => json<{ id: string; username: string; isAdmin: boolean }>(r)),
+
+  deleteUser: (id: string) =>
+    fetch(`/api/admin/users/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
 };

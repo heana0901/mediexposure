@@ -2,7 +2,7 @@
 
 import type { Client } from "@/lib/types";
 
-export type Tab = "status" | "competitors" | "trends" | "usage";
+export type Tab = "status" | "competitors" | "trends" | "usage" | "accounts";
 
 type Props = {
   clients: Client[];
@@ -27,6 +27,7 @@ const NAV_ITEMS: { key: Tab; label: string; icon: string; adminOnly?: boolean }[
   { key: "competitors", label: "경쟁병원분석", icon: "📈" },
   { key: "trends", label: "추이 분석", icon: "📊" },
   { key: "usage", label: "비용 현황", icon: "💳", adminOnly: true },
+  { key: "accounts", label: "계정 관리", icon: "👤", adminOnly: true },
 ];
 
 export function Sidebar({

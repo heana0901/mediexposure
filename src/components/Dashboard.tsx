@@ -21,6 +21,7 @@ import { ExposureStatus } from "./ExposureStatus";
 import { CompetitorAnalysis } from "./CompetitorAnalysis";
 import { TrendChart } from "./TrendChart";
 import { UsageDashboard } from "./UsageDashboard";
+import { AccountManagement } from "./AccountManagement";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
@@ -29,6 +30,7 @@ const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
   competitors: { title: "경쟁병원분석", subtitle: "미노출 항목과 경쟁병원 언급 빈도를 분석합니다" },
   trends: { title: "추이 분석", subtitle: "모니터링 실행 기록에 따른 언급률 변화를 확인합니다" },
   usage: { title: "비용 현황", subtitle: "API 호출 횟수와 예상 비용을 확인합니다" },
+  accounts: { title: "계정 관리", subtitle: "로그인 계정과 클라이언트 접근 권한을 관리합니다" },
 };
 
 export function Dashboard() {
@@ -212,6 +214,8 @@ export function Dashboard() {
 
           {tab === "usage" ? (
             <UsageDashboard usage={usage} />
+          ) : tab === "accounts" ? (
+            <AccountManagement clients={clients} currentUsername={me?.username ?? null} />
           ) : !selectedClientId ? (
             <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="font-medium text-gray-600">클라이언트를 선택해주세요</div>

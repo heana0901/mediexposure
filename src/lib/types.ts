@@ -78,3 +78,18 @@ export type TrendPoint = {
   geminiRate: number | null;
   overallRate: number | null;
 };
+
+export type AppUser = {
+  id: string;
+  username: string;
+  isAdmin: boolean;
+  createdAt: string;
+  clients: { id: string; name: string }[];
+};
+
+export type AppUserInput = {
+  username: string;
+  password: string;
+  isAdmin: boolean;
+  clientIds: string[];
+};
