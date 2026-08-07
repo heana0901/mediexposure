@@ -38,6 +38,7 @@ create table if not exists monitoring_results (
   input_tokens int,
   output_tokens int,
   estimated_cost_usd numeric,
+  sources jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
 

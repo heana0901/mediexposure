@@ -14,6 +14,7 @@ async function runProvider(provider: Provider, question: string): Promise<AiCall
       model: "",
       inputTokens: null,
       outputTokens: null,
+      sources: [],
     };
   }
 }
@@ -88,6 +89,7 @@ export async function runMonitoringForClient(
           input_tokens: sumTokens(aiResult.inputTokens, analysis.inputTokens),
           output_tokens: sumTokens(aiResult.outputTokens, analysis.outputTokens),
           estimated_cost_usd: estimatedCostUsd,
+          sources: aiResult.sources,
         };
       })
     )

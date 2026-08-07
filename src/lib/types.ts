@@ -25,6 +25,8 @@ export type Keyword = {
 
 export type Provider = "chatgpt" | "gemini";
 
+export type Source = { title: string; url: string };
+
 export type MonitoringResult = {
   id: string;
   run_id: string;
@@ -39,6 +41,7 @@ export type MonitoringResult = {
   input_tokens: number | null;
   output_tokens: number | null;
   estimated_cost_usd: number | null;
+  sources: Source[];
   created_at: string;
 };
 

@@ -22,11 +22,11 @@ type Props = {
   onLogout: () => void;
 };
 
-const NAV_ITEMS: { key: Tab; label: string; icon: string }[] = [
+const NAV_ITEMS: { key: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
   { key: "status", label: "AI노출현황", icon: "👁" },
   { key: "competitors", label: "경쟁병원분석", icon: "📈" },
   { key: "trends", label: "추이 분석", icon: "📊" },
-  { key: "usage", label: "비용 현황", icon: "💳" },
+  { key: "usage", label: "비용 현황", icon: "💳", adminOnly: true },
 ];
 
 export function Sidebar({
@@ -125,7 +125,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 px-3 pt-2 pb-3 space-y-0.5">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => (
           <button
             key={item.key}
             className={`w-full flex items-center gap-2.5 text-sm px-3 py-2 rounded-lg text-left transition-colors ${

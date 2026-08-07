@@ -115,6 +115,24 @@ function KeywordCard({
             ))}
           </div>
         )}
+
+        {active.sources.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className="text-xs text-gray-500 mr-1">출처:</span>
+            {active.sources.map((s) => (
+              <a
+                key={s.url}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs bg-blue-50 text-blue-600 rounded-full px-2 py-1 hover:bg-blue-100 truncate max-w-[220px]"
+                title={s.url}
+              >
+                🔗 {s.title}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
