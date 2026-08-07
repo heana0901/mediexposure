@@ -87,7 +87,7 @@ export function CompetitorAnalysis({
     <div className="grid md:grid-cols-2 gap-6">
       <div className="border rounded-xl bg-white p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="font-medium text-sm text-gray-700">⚠ 미노출 (미분석)</span>
+          <span className="font-medium text-sm text-gray-700">⚠ 미노출 (최근 7일)</span>
           <span className="text-xs text-gray-400">{unexposed.length}건</span>
         </div>
 

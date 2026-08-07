@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { assertClientAccess } from "@/lib/dal";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -7,6 +8,9 @@ export async function GET(request: Request) {
   if (!clientId) {
     return NextResponse.json({ error: "clientId가 필요합니다." }, { status: 400 });
   }
+
+  const access = await assertClientAccess(clientId);
+  if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase

@@ -1,20 +1,38 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { assertClientAccess, getAllowedClientIds, verifySession } from "@/lib/dal";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const clientId = searchParams.get("clientId");
+
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+
+  if (clientId) {
+    const access = await assertClientAccess(clientId);
+    if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
+  }
 
   const supabase = getSupabaseServerClient();
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
+  const allowedIds = await getAllowedClientIds(session);
+  if (allowedIds !== null && allowedIds.length === 0) {
+    return NextResponse.json({ totalRuns: 0, totalCostUsd: 0, byClient: [] });
+  }
+
   const { data: clients, error: clientsError } = await supabase.from("clients").select("id, name");
   if (clientsError) return NextResponse.json({ error: clientsError.message }, { status: 500 });
 
   let keywordsQuery = supabase.from("keywords").select("id, client_id");
-  if (clientId) keywordsQuery = keywordsQuery.eq("client_id", clientId);
+  if (clientId) {
+    keywordsQuery = keywordsQuery.eq("client_id", clientId);
+  } else if (allowedIds !== null) {
+    keywordsQuery = keywordsQuery.in("client_id", allowedIds);
+  }
   const { data: keywords, error: keywordsError } = await keywordsQuery;
   if (keywordsError) return NextResponse.json({ error: keywordsError.message }, { status: 500 });
 

@@ -58,10 +58,17 @@ export function Dashboard() {
 
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [usage, setUsage] = useState<UsageSummary>({ totalRuns: 0, totalCostUsd: 0, byClient: [] });
+  const [me, setMe] = useState<{ username: string; isAdmin: boolean } | null>(null);
 
   useEffect(() => {
     api.listClients().then(setClients).catch((e) => setError(e.message));
+    api.getMe().then(setMe).catch(() => {});
   }, []);
+
+  async function handleLogout() {
+    await api.logout();
+    window.location.href = "/login";
+  }
 
   const [resetKey, setResetKey] = useState<string | null>(null);
   if (selectedClientId !== resetKey) {
@@ -185,6 +192,9 @@ export function Dashboard() {
         canRun={!!selectedClientId && keywords.length > 0}
         tab={tab}
         onTabChange={setTab}
+        username={me?.username ?? null}
+        isAdmin={me?.isAdmin ?? false}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 overflow-y-auto">

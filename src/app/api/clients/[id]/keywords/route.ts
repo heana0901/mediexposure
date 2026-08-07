@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { assertClientAccess } from "@/lib/dal";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const access = await assertClientAccess(id);
+  if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
+
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from("keywords")
@@ -22,6 +26,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const access = await assertClientAccess(id);
+  if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
+
   const { text } = await request.json();
   if (!text || typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "질문을 입력하세요." }, { status: 400 });

@@ -41,6 +41,20 @@ create table if not exists monitoring_results (
   created_at timestamptz not null default now()
 );
 
+create table if not exists app_users (
+  id uuid primary key default gen_random_uuid(),
+  username text not null unique,
+  password_hash text not null,
+  is_admin boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists user_clients (
+  user_id uuid not null references app_users(id) on delete cascade,
+  client_id uuid not null references clients(id) on delete cascade,
+  primary key (user_id, client_id)
+);
+
 create index if not exists idx_keywords_client on keywords(client_id);
 create index if not exists idx_runs_client on monitoring_runs(client_id);
 create index if not exists idx_results_run on monitoring_results(run_id);

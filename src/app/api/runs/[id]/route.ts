@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { assertClientAccess } from "@/lib/dal";
 
 export async function GET(
   _request: Request,
@@ -17,6 +18,9 @@ export async function GET(
   if (runError || !run) {
     return NextResponse.json({ error: "실행 이력을 찾을 수 없습니다." }, { status: 404 });
   }
+
+  const access = await assertClientAccess(run.client_id);
+  if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
   const { data: results, error: resultsError } = await supabase
     .from("monitoring_results")

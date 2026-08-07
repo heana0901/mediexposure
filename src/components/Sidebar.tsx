@@ -17,6 +17,9 @@ type Props = {
   canRun: boolean;
   tab: Tab;
   onTabChange: (tab: Tab) => void;
+  username: string | null;
+  isAdmin: boolean;
+  onLogout: () => void;
 };
 
 const NAV_ITEMS: { key: Tab; label: string; icon: string }[] = [
@@ -39,6 +42,9 @@ export function Sidebar({
   canRun,
   tab,
   onTabChange,
+  username,
+  isAdmin,
+  onLogout,
 }: Props) {
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
@@ -57,12 +63,14 @@ export function Sidebar({
       </div>
 
       <div className="px-4 pb-4 space-y-3">
-        <button
-          className="w-full text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
-          onClick={onOpenCreateForm}
-        >
-          + 클라이언트 추가
-        </button>
+        {isAdmin && (
+          <button
+            className="w-full text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
+            onClick={onOpenCreateForm}
+          >
+            + 클라이언트 추가
+          </button>
+        )}
 
         <select
           className="w-full border rounded-lg px-3 py-2 text-sm"
@@ -94,13 +102,15 @@ export function Sidebar({
               <button className="text-gray-500 hover:text-gray-800" onClick={onOpenEditForm}>
                 정보 수정
               </button>
-              <button
-                className="text-red-500 hover:text-red-700 disabled:opacity-50"
-                disabled={deleting}
-                onClick={onDeleteClient}
-              >
-                {deleting ? "삭제 중..." : "클라이언트 삭제"}
-              </button>
+              {isAdmin && (
+                <button
+                  className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                  disabled={deleting}
+                  onClick={onDeleteClient}
+                >
+                  {deleting ? "삭제 중..." : "클라이언트 삭제"}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -135,6 +145,18 @@ export function Sidebar({
           </button>
         ))}
       </nav>
+
+      {username && (
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+          <span className="text-xs text-gray-500">
+            {username}
+            {isAdmin && <span className="ml-1 text-gray-300">(관리자)</span>}
+          </span>
+          <button className="text-xs text-gray-400 hover:text-gray-700" onClick={onLogout}>
+            로그아웃
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

@@ -12,6 +12,9 @@ import type {
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `요청 실패 (${res.status})`);
   }
@@ -19,6 +22,10 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  getMe: () => fetch("/api/auth/me").then((r) => json<{ username: string; isAdmin: boolean }>(r)),
+
+  logout: () => fetch("/api/auth/logout", { method: "POST" }).then((r) => json<{ ok: true }>(r)),
+
   listClients: () => fetch("/api/clients").then((r) => json<Client[]>(r)),
 
   createClient: (input: ClientInput) =>

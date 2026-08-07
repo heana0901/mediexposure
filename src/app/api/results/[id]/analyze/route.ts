@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { estimateCostUsd } from "@/lib/pricing";
+import { assertClientAccess } from "@/lib/dal";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || "gpt-4o-mini";
@@ -15,7 +16,7 @@ export async function POST(
 
   const { data: result, error } = await supabase
     .from("monitoring_results")
-    .select("*, keywords(text, clients(name, department, region))")
+    .select("*, keywords(text, client_id, clients(name, department, region))")
     .eq("id", id)
     .single();
 
@@ -25,9 +26,13 @@ export async function POST(
 
   const keyword = result.keywords as unknown as {
     text: string;
+    client_id: string;
     clients: { name: string; department: string | null; region: string | null };
   };
   const clientInfo = keyword.clients;
+
+  const access = await assertClientAccess(keyword.client_id);
+  if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
   const prompt = `아래는 AI 검색엔진에 "${keyword.text}"라고 질문했을 때 나온 답변이다. 이 답변에 "${clientInfo.name}"${
     clientInfo.department ? ` (${clientInfo.department})` : ""

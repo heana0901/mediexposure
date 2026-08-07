@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { assertClientAccess, verifySession } from "@/lib/dal";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const access = await assertClientAccess(id);
+  if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
+
   const { name, region, department, director_name, is_specialist } = await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "병원명을 입력하세요." }, { status: 400 });
@@ -34,6 +38,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  if (!session.isAdmin) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+
   const supabase = getSupabaseServerClient();
   const { error } = await supabase.from("clients").delete().eq("id", id);
 
