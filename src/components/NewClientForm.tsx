@@ -7,6 +7,9 @@ type Props = {
   client?: Client;
   onSubmit: (input: ClientInput) => Promise<void>;
   onClose: () => void;
+  onDelete?: () => void;
+  deleting?: boolean;
+  canDelete?: boolean;
 };
 
 function toSpecialistOption(value: boolean | null | undefined): "unknown" | "yes" | "no" {
@@ -15,7 +18,7 @@ function toSpecialistOption(value: boolean | null | undefined): "unknown" | "yes
   return "unknown";
 }
 
-export function NewClientForm({ client, onSubmit, onClose }: Props) {
+export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, canDelete }: Props) {
   const isEdit = !!client;
   const [name, setName] = useState(client?.name ?? "");
   const [region, setRegion] = useState(client?.region ?? "");
@@ -109,13 +112,25 @@ export function NewClientForm({ client, onSubmit, onClose }: Props) {
         </label>
       </div>
 
-      <button
-        className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50"
-        disabled={!name.trim() || saving}
-        onClick={handleSubmit}
-      >
-        {saving ? "저장 중..." : isEdit ? "저장" : "추가"}
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50"
+          disabled={!name.trim() || saving}
+          onClick={handleSubmit}
+        >
+          {saving ? "저장 중..." : isEdit ? "저장" : "추가"}
+        </button>
+
+        {isEdit && canDelete && onDelete && (
+          <button
+            className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
+            disabled={deleting}
+            onClick={onDelete}
+          >
+            {deleting ? "삭제 중..." : "클라이언트 삭제"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { MonitoringResult, MonitoringRun, Provider } from "@/lib/types";
+import { IconEye, IconLink } from "./icons";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
@@ -125,10 +126,11 @@ function KeywordCard({
                 href={s.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs bg-blue-50 text-blue-600 rounded-full px-2 py-1 hover:bg-blue-100 truncate max-w-[220px]"
+                className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 rounded-full px-2 py-1 hover:bg-blue-100 truncate max-w-[220px]"
                 title={s.url}
               >
-                🔗 {s.title}
+                <IconLink className="w-3 h-3 shrink-0" />
+                {s.title}
               </a>
             ))}
           </div>
@@ -160,7 +162,9 @@ export function ExposureStatus({ clientName, results, runs, selectedRunId, onSel
 
       {groups.length === 0 ? (
         <div className="border rounded-xl bg-white flex flex-col items-center justify-center py-20 text-gray-400">
-          <div className="text-4xl mb-3">👁</div>
+          <div className="w-12 h-12 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center mb-3">
+            <IconEye className="w-6 h-6" />
+          </div>
           <div className="font-medium text-gray-600">모니터링 결과가 없습니다</div>
           <div className="text-sm">질문을 등록하고 모니터링을 실행해보세요</div>
         </div>

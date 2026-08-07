@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CompetitorFrequencyEntry, MonitoringResult, Provider, SelfExposure } from "@/lib/types";
 import { api } from "@/lib/api";
+import { IconAlertTriangle, IconBuilding, IconTrendingUp } from "./icons";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
@@ -87,7 +88,12 @@ export function CompetitorAnalysis({
     <div className="grid md:grid-cols-2 gap-6">
       <div className="border rounded-xl bg-white p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="font-medium text-sm text-gray-700">⚠ 미노출 (최근 7일)</span>
+          <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
+            <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <IconAlertTriangle className="w-4 h-4" />
+            </span>
+            미노출 (최근 7일)
+          </span>
           <span className="text-xs text-gray-400">{unexposed.length}건</span>
         </div>
 
@@ -105,7 +111,12 @@ export function CompetitorAnalysis({
       <div className="space-y-6">
         <div className="border rounded-xl bg-white p-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="font-medium text-sm text-gray-700">🏥 {clientName} 노출 빈도</span>
+            <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
+              <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <IconBuilding className="w-4 h-4" />
+              </span>
+              {clientName} 노출 빈도
+            </span>
             <span className="text-xs text-gray-400">전체 {selfExposure.total}건 기준</span>
           </div>
           <div className="flex items-center gap-3 mb-3">
@@ -124,7 +135,12 @@ export function CompetitorAnalysis({
 
         <div className="border rounded-xl bg-white p-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="font-medium text-sm text-gray-700">📈 경쟁병원 노출 빈도</span>
+            <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
+              <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <IconTrendingUp className="w-4 h-4" />
+              </span>
+              경쟁병원 노출 빈도
+            </span>
             <span className="text-xs text-gray-400">전체 {totalResults}건 기준</span>
           </div>
 

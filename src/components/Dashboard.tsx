@@ -140,6 +140,7 @@ export function Dashboard() {
       await api.deleteClient(selectedClient.id);
       setClients((prev) => prev.filter((c) => c.id !== selectedClient.id));
       setSelectedClientId(null);
+      setClientFormMode("none");
     } finally {
       setDeleting(false);
     }
@@ -187,8 +188,6 @@ export function Dashboard() {
         onSelectClient={setSelectedClientId}
         onOpenCreateForm={() => setClientFormMode("create")}
         onOpenEditForm={() => setClientFormMode("edit")}
-        onDeleteClient={handleDeleteClient}
-        deleting={deleting}
         onRunMonitoring={handleRunMonitoring}
         isRunning={isRunning}
         canRun={!!selectedClientId && keywords.length > 0}
@@ -268,6 +267,9 @@ export function Dashboard() {
             client={selectedClient}
             onSubmit={handleUpdateClient}
             onClose={() => setClientFormMode("none")}
+            onDelete={handleDeleteClient}
+            deleting={deleting}
+            canDelete={me?.isAdmin ?? false}
           />
         </Modal>
       )}
