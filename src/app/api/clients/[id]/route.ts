@@ -10,7 +10,7 @@ export async function PATCH(
   const access = await assertClientAccess(id);
   if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
-  const { name, region, department, director_name, is_specialist } = await request.json();
+  const { name, region, department, director_name, is_specialist, contact_email } = await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "병원명을 입력하세요." }, { status: 400 });
   }
@@ -24,6 +24,7 @@ export async function PATCH(
       department: department?.trim() || null,
       director_name: director_name?.trim() || null,
       is_specialist: typeof is_specialist === "boolean" ? is_specialist : null,
+      contact_email: contact_email?.trim() || null,
     })
     .eq("id", id)
     .select()

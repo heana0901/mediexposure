@@ -11,17 +11,24 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   if (!session.isAdmin) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
 
-  const { email } = await request.json();
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("app_users")
-    .update({ email: typeof email === "string" && email.trim() ? email.trim() : null })
-    .eq("id", id)
-    .select("id, email")
-    .single();
+  const { clientIds } = await request.json();
+  if (!Array.isArray(clientIds)) {
+    return NextResponse.json({ error: "clientIds가 필요합니다." }, { status: 400 });
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  const supabase = getSupabaseServerClient();
+
+  const { error: deleteError } = await supabase.from("user_clients").delete().eq("user_id", id);
+  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+
+  if (clientIds.length > 0) {
+    const { error: insertError } = await supabase
+      .from("user_clients")
+      .insert(clientIds.map((clientId: string) => ({ user_id: id, client_id: clientId })));
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(

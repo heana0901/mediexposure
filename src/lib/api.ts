@@ -106,17 +106,17 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    }).then((r) => json<{ id: string; username: string; isAdmin: boolean; email: string | null }>(r)),
+    }).then((r) => json<{ id: string; username: string; isAdmin: boolean }>(r)),
 
   deleteUser: (id: string) =>
     fetch(`/api/admin/users/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
 
-  updateUserEmail: (id: string, email: string) =>
+  updateUserClients: (id: string, clientIds: string[]) =>
     fetch(`/api/admin/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    }).then((r) => json<{ id: string; email: string | null }>(r)),
+      body: JSON.stringify({ clientIds }),
+    }).then((r) => json<{ ok: true }>(r)),
 
   sendReport: (clientId: string) =>
     fetch("/api/reports/send", {

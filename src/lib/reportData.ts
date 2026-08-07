@@ -3,7 +3,14 @@ import { getSupabaseServerClient } from "./supabase";
 import type { CompetitorFrequencyEntry, SelfExposure } from "./types";
 
 export type ClientReportData = {
-  client: { id: string; name: string; region: string | null; department: string | null; director_name: string | null };
+  client: {
+    id: string;
+    name: string;
+    region: string | null;
+    department: string | null;
+    director_name: string | null;
+    contact_email: string | null;
+  };
   selfExposure: SelfExposure;
   competitorTop5: CompetitorFrequencyEntry[];
   unexposedRecent: { provider: "chatgpt" | "gemini"; keyword: string; competitors: string[] }[];
@@ -16,7 +23,7 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
 
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, region, department, director_name")
+    .select("id, name, region, department, director_name, contact_email")
     .eq("id", clientId)
     .single();
   if (clientError || !client) throw new Error(clientError?.message ?? "클라이언트를 찾을 수 없습니다.");
@@ -87,13 +94,25 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
   const rate = (list: { mentioned: boolean }[]) =>
     list.length === 0 ? null : Math.round((list.filter((r) => r.mentioned).length / list.length) * 100);
 
-  const weeklyTrend = (runs ?? []).slice(-7).map((run) => {
-    const forRun = (runResults ?? []).filter((r) => r.run_id === run.id);
+  // 같은 날짜에 여러 번 실행됐으면 그날의 결과를 모두 합쳐서 하나로 집계한다
+  const runDateById = new Map((runs ?? []).map((r) => [r.id, r.created_at.slice(0, 10)]));
+  const resultsByDate = new Map<string, { provider: string; mentioned: boolean }[]>();
+  for (const result of runResults ?? []) {
+    const dateKey = runDateById.get(result.run_id);
+    if (!dateKey) continue;
+    const list = resultsByDate.get(dateKey) ?? [];
+    list.push(result);
+    resultsByDate.set(dateKey, list);
+  }
+  const sortedDates = Array.from(resultsByDate.keys()).sort();
+
+  const weeklyTrend = sortedDates.slice(-7).map((dateKey) => {
+    const forDate = resultsByDate.get(dateKey) ?? [];
     return {
-      createdAt: run.created_at,
-      chatgptRate: rate(forRun.filter((r) => r.provider === "chatgpt")),
-      geminiRate: rate(forRun.filter((r) => r.provider === "gemini")),
-      overallRate: rate(forRun),
+      createdAt: dateKey,
+      chatgptRate: rate(forDate.filter((r) => r.provider === "chatgpt")),
+      geminiRate: rate(forDate.filter((r) => r.provider === "gemini")),
+      overallRate: rate(forDate),
     };
   });
 

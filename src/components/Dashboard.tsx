@@ -114,8 +114,8 @@ export function Dashboard() {
 
   useEffect(() => {
     if (tab !== "usage") return;
-    api.getUsage(selectedClientId ?? undefined).then(setUsage).catch((e) => setError(e.message));
-  }, [tab, selectedClientId]);
+    api.getUsage().then(setUsage).catch((e) => setError(e.message));
+  }, [tab]);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 

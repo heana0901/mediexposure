@@ -27,6 +27,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
   const [isSpecialist, setIsSpecialist] = useState<"unknown" | "yes" | "no">(
     toSpecialistOption(client?.is_specialist)
   );
+  const [contactEmail, setContactEmail] = useState(client?.contact_email ?? "");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit() {
@@ -39,6 +40,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         department: department.trim() || undefined,
         director_name: directorName.trim() || undefined,
         is_specialist: isSpecialist === "unknown" ? null : isSpecialist === "yes",
+        contact_email: contactEmail.trim() || undefined,
       });
       onClose();
     } finally {
@@ -109,6 +111,17 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
             <option value="yes">전문의</option>
             <option value="no">전문의 아님</option>
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
+          리포트 수신 이메일 (담당자)
+          <input
+            type="email"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            placeholder="예: manager@hospital.com"
+          />
         </label>
       </div>
 

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   if (!session.isAdmin) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
 
-  const { name, region, department, director_name, is_specialist } = await request.json();
+  const { name, region, department, director_name, is_specialist, contact_email } = await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "병원명을 입력하세요." }, { status: 400 });
   }
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       department: department?.trim() || null,
       director_name: director_name?.trim() || null,
       is_specialist: typeof is_specialist === "boolean" ? is_specialist : null,
+      contact_email: contact_email?.trim() || null,
     })
     .select()
     .single();

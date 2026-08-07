@@ -5,6 +5,7 @@ export type Client = {
   department: string | null;
   director_name: string | null;
   is_specialist: boolean | null;
+  contact_email: string | null;
   created_at: string;
 };
 
@@ -14,6 +15,7 @@ export type ClientInput = {
   department?: string;
   director_name?: string;
   is_specialist?: boolean | null;
+  contact_email?: string;
 };
 
 export type Keyword = {
@@ -83,7 +85,6 @@ export type AppUser = {
   id: string;
   username: string;
   isAdmin: boolean;
-  email: string | null;
   createdAt: string;
   clients: { id: string; name: string }[];
 };
@@ -93,5 +94,4 @@ export type AppUserInput = {
   password: string;
   isAdmin: boolean;
   clientIds: string[];
-  email?: string;
 };

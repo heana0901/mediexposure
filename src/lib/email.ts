@@ -1,10 +1,31 @@
 import "server-only";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
+
+let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+  }
+  return transporter;
+}
 
 export async function sendReportEmail(to: string, subject: string, html: string) {
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const from = process.env.RESEND_FROM_EMAIL || "Medi-Exposure <onboarding@resend.dev>";
+  const user = process.env.GMAIL_USER;
+  if (!user || !process.env.GMAIL_APP_PASSWORD) {
+    throw new Error("GMAIL_USER / GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
+  }
 
-  const { error } = await resend.emails.send({ from, to, subject, html });
-  if (error) throw new Error(error.message);
+  await getTransporter().sendMail({
+    from: `Medi-Exposure <${user}>`,
+    to,
+    subject,
+    html,
+  });
 }
