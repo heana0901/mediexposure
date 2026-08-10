@@ -236,11 +236,11 @@ export function CompetitorAnalysis({
                   ChatGPT
                 </span>
                 {topChatgpt ? (
-                  <span className="text-sm font-medium truncate">
+                  <span className="text-sm truncate">
                     {topChatgpt.isSelf ? (
-                      <span className="text-blue-600">{topChatgpt.name} (우리{entityLabel})</span>
+                      <span className="text-blue-600 font-bold">{topChatgpt.name}</span>
                     ) : (
-                      <span className="text-gray-800">{topChatgpt.name}</span>
+                      <span className="text-black font-bold">{topChatgpt.name}</span>
                     )}{" "}
                     <span className="text-gray-400 font-normal">({topChatgpt.count}회)</span>
                   </span>
@@ -253,11 +253,11 @@ export function CompetitorAnalysis({
                   Gemini
                 </span>
                 {topGemini ? (
-                  <span className="text-sm font-medium truncate">
+                  <span className="text-sm truncate">
                     {topGemini.isSelf ? (
-                      <span className="text-blue-600">{topGemini.name} (우리{entityLabel})</span>
+                      <span className="text-blue-600 font-bold">{topGemini.name}</span>
                     ) : (
-                      <span className="text-gray-800">{topGemini.name}</span>
+                      <span className="text-black font-bold">{topGemini.name}</span>
                     )}{" "}
                     <span className="text-gray-400 font-normal">({topGemini.count}회)</span>
                   </span>
