@@ -166,19 +166,27 @@ export function CompetitorAnalysis({
 
   type RankedEntity = { name: string; count: number; isSelf: boolean };
 
-  function topByProvider(provider: "chatgpt" | "gemini"): RankedEntity | null {
+  function rankedCandidates(provider: "chatgpt" | "gemini"): RankedEntity[] {
     const candidates: RankedEntity[] = [
       { name: clientName, count: selfExposure[provider].count, isSelf: true },
       ...competitorFrequency.map((c) => ({ name: c.name, count: c[provider], isSelf: false })),
     ];
-    return candidates.reduce<RankedEntity | null>(
-      (best, c) => (c.count > 0 && (!best || c.count > best.count) ? c : best),
-      null
-    );
+    return candidates.filter((c) => c.count > 0).sort((a, b) => b.count - a.count);
+  }
+
+  function topByProvider(provider: "chatgpt" | "gemini"): RankedEntity | null {
+    return rankedCandidates(provider)[0] ?? null;
+  }
+
+  function selfRankByProvider(provider: "chatgpt" | "gemini"): number | null {
+    const idx = rankedCandidates(provider).findIndex((c) => c.isSelf);
+    return idx === -1 ? null : idx + 1;
   }
 
   const topChatgpt = topByProvider("chatgpt");
   const topGemini = topByProvider("gemini");
+  const selfChatgptRank = selfRankByProvider("chatgpt");
+  const selfGeminiRank = selfRankByProvider("gemini");
 
   return (
     <div>
@@ -215,9 +223,11 @@ export function CompetitorAnalysis({
             <div className="flex gap-4 text-xs text-gray-500">
               <span>
                 ChatGPT {selfExposure.chatgpt.count}/{selfExposure.chatgpt.total}회
+                {selfChatgptRank && <span className="text-blue-600 font-semibold"> · {selfChatgptRank}위</span>}
               </span>
               <span>
                 Gemini {selfExposure.gemini.count}/{selfExposure.gemini.total}회
+                {selfGeminiRank && <span className="text-blue-600 font-semibold"> · {selfGeminiRank}위</span>}
               </span>
             </div>
           </div>
