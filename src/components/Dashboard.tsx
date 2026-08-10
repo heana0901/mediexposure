@@ -29,7 +29,7 @@ type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
 const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
   status: { title: "AI 노출현황", subtitle: "클라이언트별 AI 검색 노출도를 모니터링합니다" },
-  competitors: { title: "경쟁병원분석", subtitle: "미노출 항목과 경쟁병원 언급 빈도를 분석합니다" },
+  competitors: { title: "경쟁분석", subtitle: "미노출 항목과 경쟁사 언급 빈도를 분석합니다" },
   trends: { title: "추이 분석", subtitle: "모니터링 실행 기록에 따른 언급률 변화를 확인합니다" },
   usage: { title: "비용 현황", subtitle: "API 호출 횟수와 예상 비용을 확인합니다" },
   accounts: { title: "계정 관리", subtitle: "로그인 계정과 클라이언트 접근 권한을 관리합니다" },
@@ -337,6 +337,7 @@ export function Dashboard() {
                   />
                   <ExposureStatus
                     clientName={selectedClient?.name ?? ""}
+                    clientType={selectedClient?.client_type ?? "hospital"}
                     results={results}
                     runs={runs}
                     selectedRunId={selectedRunId}
@@ -348,6 +349,7 @@ export function Dashboard() {
               {tab === "competitors" && (
                 <CompetitorAnalysis
                   clientName={selectedClient?.name ?? ""}
+                  clientType={selectedClient?.client_type ?? "hospital"}
                   unexposed={competitorData.unexposed}
                   competitorFrequency={competitorData.competitorFrequency}
                   totalResults={competitorData.totalResults}

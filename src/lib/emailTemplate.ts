@@ -31,6 +31,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
       : "최근 7일";
 
   const metaLine = [client.department, client.region].filter(Boolean).join(" · ");
+  const competitorLabel = client.client_type === "business" ? "경쟁업체" : "경쟁병원";
 
   const trendRows = weeklyTrend
     .map(
@@ -65,7 +66,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
           <span style="margin-left:6px;color:${INK};">${u.keyword}</span>
         </div>
         <div style="font-size:12px;color:${MUTED};">
-          ${u.competitors.length > 0 ? `대신 언급된 경쟁병원: ${u.competitors.slice(0, 5).join(", ")}${u.competitors.length > 5 ? " 외" : ""}` : "경쟁병원 언급 없이 미노출"}
+          ${u.competitors.length > 0 ? `대신 언급된 ${competitorLabel}: ${u.competitors.slice(0, 5).join(", ")}${u.competitors.length > 5 ? " 외" : ""}` : `${competitorLabel} 언급 없이 미노출`}
         </div>
       </div>`
     )
@@ -128,7 +129,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
       competitorTop5.length > 0
         ? `
     <div style="margin-bottom:24px;">
-      <div style="font-size:15px;font-weight:700;color:${INK};margin-bottom:10px;">경쟁병원 노출 빈도 TOP 5</div>
+      <div style="font-size:15px;font-weight:700;color:${INK};margin-bottom:10px;">${competitorLabel} 노출 빈도 TOP 5</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         ${competitorRows}
       </table>

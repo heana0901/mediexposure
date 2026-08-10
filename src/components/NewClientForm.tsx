@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Client, ClientInput } from "@/lib/types";
+import type { Client, ClientInput, ClientType } from "@/lib/types";
 
 type Props = {
   client?: Client;
@@ -18,8 +18,28 @@ function toSpecialistOption(value: boolean | null | undefined): "unknown" | "yes
   return "unknown";
 }
 
+const TYPE_LABELS: Record<ClientType, { name: string; namePlaceholder: string; department: string; departmentPlaceholder: string; director: string; directorPlaceholder: string }> = {
+  hospital: {
+    name: "병원명 *",
+    namePlaceholder: "예: 서울항외과",
+    department: "진료과목",
+    departmentPlaceholder: "예: 대장항문외과",
+    director: "대표원장",
+    directorPlaceholder: "예: 홍길동",
+  },
+  business: {
+    name: "업체명 *",
+    namePlaceholder: "예: 무신사 스토어",
+    department: "업종/카테고리",
+    departmentPlaceholder: "예: 여성의류 쇼핑몰",
+    director: "대표자명",
+    directorPlaceholder: "예: 홍길동",
+  },
+};
+
 export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, canDelete }: Props) {
   const isEdit = !!client;
+  const [clientType, setClientType] = useState<ClientType>(client?.client_type ?? "hospital");
   const [name, setName] = useState(client?.name ?? "");
   const [region, setRegion] = useState(client?.region ?? "");
   const [department, setDepartment] = useState(client?.department ?? "");
@@ -30,16 +50,19 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
   const [contactEmail, setContactEmail] = useState(client?.contact_email ?? "");
   const [saving, setSaving] = useState(false);
 
+  const labels = TYPE_LABELS[clientType];
+
   async function handleSubmit() {
     if (!name.trim()) return;
     setSaving(true);
     try {
       await onSubmit({
         name: name.trim(),
+        client_type: clientType,
         region: region.trim() || undefined,
         department: department.trim() || undefined,
         director_name: directorName.trim() || undefined,
-        is_specialist: isSpecialist === "unknown" ? null : isSpecialist === "yes",
+        is_specialist: clientType === "hospital" ? (isSpecialist === "unknown" ? null : isSpecialist === "yes") : null,
         contact_email: contactEmail.trim() || undefined,
       });
       onClose();
@@ -59,14 +82,26 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         </button>
       </div>
 
+      <label className="flex flex-col gap-1 text-xs text-gray-500">
+        업종 유형
+        <select
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+          value={clientType}
+          onChange={(e) => setClientType(e.target.value as ClientType)}
+        >
+          <option value="hospital">병원</option>
+          <option value="business">일반 사업자 (쇼핑몰 등)</option>
+        </select>
+      </label>
+
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-xs text-gray-500">
-          병원명 *
+          {labels.name}
           <input
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예: 서울항외과"
+            placeholder={labels.namePlaceholder}
           />
         </label>
 
@@ -81,37 +116,39 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         </label>
 
         <label className="flex flex-col gap-1 text-xs text-gray-500">
-          진료과목
+          {labels.department}
           <input
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            placeholder="예: 대장항문외과"
+            placeholder={labels.departmentPlaceholder}
           />
         </label>
 
         <label className="flex flex-col gap-1 text-xs text-gray-500">
-          대표원장
+          {labels.director}
           <input
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={directorName}
             onChange={(e) => setDirectorName(e.target.value)}
-            placeholder="예: 홍길동"
+            placeholder={labels.directorPlaceholder}
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
-          전문의 여부
-          <select
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
-            value={isSpecialist}
-            onChange={(e) => setIsSpecialist(e.target.value as "unknown" | "yes" | "no")}
-          >
-            <option value="unknown">선택 안 함</option>
-            <option value="yes">전문의</option>
-            <option value="no">전문의 아님</option>
-          </select>
-        </label>
+        {clientType === "hospital" && (
+          <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
+            전문의 여부
+            <select
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+              value={isSpecialist}
+              onChange={(e) => setIsSpecialist(e.target.value as "unknown" | "yes" | "no")}
+            >
+              <option value="unknown">선택 안 함</option>
+              <option value="yes">전문의</option>
+              <option value="no">전문의 아님</option>
+            </select>
+          </label>
+        )}
 
         <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
           리포트 수신 이메일 (담당자)
@@ -120,7 +157,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
-            placeholder="예: manager@hospital.com"
+            placeholder="예: manager@example.com"
           />
         </label>
       </div>

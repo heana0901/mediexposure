@@ -19,9 +19,13 @@ async function runProvider(provider: Provider, question: string): Promise<AiCall
   }
 }
 
-async function safeAnalyze(rawResponse: string, clientName: string): Promise<AnalysisResult> {
+async function safeAnalyze(
+  rawResponse: string,
+  clientName: string,
+  clientType: "hospital" | "business"
+): Promise<AnalysisResult> {
   try {
-    return await analyzeResponse(rawResponse, clientName);
+    return await analyzeResponse(rawResponse, clientName, clientType);
   } catch (err) {
     console.error("analyzeResponse 실패:", err);
     return {
@@ -44,8 +48,9 @@ const PROVIDERS: Provider[] = ["chatgpt", "gemini"];
 
 export async function runMonitoringForClient(
   supabase: SupabaseClient,
-  client: { id: string; name: string }
+  client: { id: string; name: string; client_type?: "hospital" | "business" }
 ) {
+  const clientType = client.client_type ?? "hospital";
   const { data: keywords, error: keywordsError } = await supabase
     .from("keywords")
     .select("*")
@@ -66,7 +71,7 @@ export async function runMonitoringForClient(
     keywords.flatMap((keyword) =>
       PROVIDERS.map(async (provider) => {
         const aiResult = await runProvider(provider, keyword.text);
-        const analysis = await safeAnalyze(aiResult.text, client.name);
+        const analysis = await safeAnalyze(aiResult.text, client.name, clientType);
 
         const providerCost = estimateCostUsd(
           aiResult.model || null,

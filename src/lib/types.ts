@@ -1,6 +1,9 @@
+export type ClientType = "hospital" | "business";
+
 export type Client = {
   id: string;
   name: string;
+  client_type: ClientType;
   region: string | null;
   department: string | null;
   director_name: string | null;
@@ -13,6 +16,7 @@ export type Client = {
 
 export type ClientInput = {
   name: string;
+  client_type?: ClientType;
   region?: string;
   department?: string;
   director_name?: string;

@@ -16,7 +16,7 @@ export async function POST(
 
   const { data: result, error } = await supabase
     .from("monitoring_results")
-    .select("*, keywords(text, client_id, clients(name, department, region))")
+    .select("*, keywords(text, client_id, clients(name, department, region, client_type))")
     .eq("id", id)
     .single();
 
@@ -27,25 +27,26 @@ export async function POST(
   const keyword = result.keywords as unknown as {
     text: string;
     client_id: string;
-    clients: { name: string; department: string | null; region: string | null };
+    clients: { name: string; department: string | null; region: string | null; client_type: "hospital" | "business" };
   };
   const clientInfo = keyword.clients;
+  const subject = clientInfo.client_type === "business" ? "업체" : "병원";
 
   const access = await assertClientAccess(keyword.client_id);
   if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
   const prompt = `아래는 AI 검색엔진에 "${keyword.text}"라고 질문했을 때 나온 답변이다. 이 답변에 "${clientInfo.name}"${
     clientInfo.department ? ` (${clientInfo.department})` : ""
-  } 병원이 언급되지 않았다.
+  } ${subject}이 언급되지 않았다.
 
 답변 텍스트:
 """
 ${result.raw_response}
 """
 
-언급된 경쟁 병원: ${(result.competitors as string[]).join(", ") || "없음"}
+언급된 경쟁 ${subject}: ${(result.competitors as string[]).join(", ") || "없음"}
 
-이 병원이 왜 언급되지 않았을지, 위에 언급된 경쟁 병원들과 비교했을 때 어떤 점이 부족해서 노출되지 않았을 가능성이 높은지 마케팅 담당자가 참고할 수 있도록 2~3문장으로 간결하게 분석해줘.`;
+이 ${subject}이 왜 언급되지 않았을지, 위에 언급된 경쟁 ${subject}들과 비교했을 때 어떤 점이 부족해서 노출되지 않았을 가능성이 높은지 마케팅 담당자가 참고할 수 있도록 2~3문장으로 간결하게 분석해줘.`;
 
   let analysisNote: string;
   let inputTokens: number | null = null;

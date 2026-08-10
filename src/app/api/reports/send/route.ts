@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
     if (!data.client.contact_email) {
       return NextResponse.json(
-        { error: "이 병원에 등록된 수신 이메일이 없습니다. '정보 수정'에서 리포트 수신 이메일을 등록해주세요." },
+        { error: "이 클라이언트에 등록된 수신 이메일이 없습니다. '정보 수정'에서 리포트 수신 이메일을 등록해주세요." },
         { status: 400 }
       );
     }

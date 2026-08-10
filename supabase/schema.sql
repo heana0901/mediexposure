@@ -4,6 +4,7 @@
 create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  client_type text not null default 'hospital',
   region text,
   department text,
   director_name text,

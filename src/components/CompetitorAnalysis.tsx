@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { CompetitorFrequencyEntry, MonitoringResult, Provider, SelfExposure } from "@/lib/types";
+import type { ClientType, CompetitorFrequencyEntry, MonitoringResult, Provider, SelfExposure } from "@/lib/types";
 import { api } from "@/lib/api";
 import { IconAlertTriangle, IconBuilding, IconTrendingUp } from "./icons";
 
@@ -17,6 +17,7 @@ const GEMINI_COLOR = "#1baf7a";
 
 type Props = {
   clientName: string;
+  clientType: ClientType;
   unexposed: ResultWithKeyword[];
   competitorFrequency: CompetitorFrequencyEntry[];
   totalResults: number;
@@ -82,12 +83,14 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
 
 export function CompetitorAnalysis({
   clientName,
+  clientType,
   unexposed,
   competitorFrequency,
   totalResults,
   selfExposure,
 }: Props) {
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
+  const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -144,7 +147,7 @@ export function CompetitorAnalysis({
               <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                 <IconTrendingUp className="w-4 h-4" />
               </span>
-              경쟁병원 노출 빈도
+              {competitorLabel} 노출 빈도
             </span>
             <span className="text-xs text-gray-400">전체 {totalResults}건 기준</span>
           </div>

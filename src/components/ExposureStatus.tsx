@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MonitoringResult, MonitoringRun, Provider } from "@/lib/types";
+import type { ClientType, MonitoringResult, MonitoringRun, Provider } from "@/lib/types";
 import { IconEye, IconLink } from "./icons";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
 type Props = {
   clientName: string;
+  clientType: ClientType;
   results: ResultWithKeyword[];
   runs: MonitoringRun[];
   selectedRunId: string | null;
@@ -46,13 +47,16 @@ function highlight(text: string, clientName: string) {
 
 function KeywordCard({
   clientName,
+  clientType,
   keywordText,
   results,
 }: {
   clientName: string;
+  clientType: ClientType;
   keywordText: string;
   results: ResultWithKeyword[];
 }) {
+  const competitorLabel = clientType === "hospital" ? "경쟁 병원" : "경쟁 업체";
   const mentionedCount = results.filter((r) => r.mentioned).length;
   const overallRate = Math.round((mentionedCount / results.length) * 100);
 
@@ -105,7 +109,7 @@ function KeywordCard({
         </div>
         {active.competitors.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
-            <span className="text-xs text-gray-500 mr-1">경쟁 병원:</span>
+            <span className="text-xs text-gray-500 mr-1">{competitorLabel}:</span>
             {active.competitors.map((c) => (
               <span
                 key={c}
@@ -140,7 +144,7 @@ function KeywordCard({
   );
 }
 
-export function ExposureStatus({ clientName, results, runs, selectedRunId, onSelectRun }: Props) {
+export function ExposureStatus({ clientName, clientType, results, runs, selectedRunId, onSelectRun }: Props) {
   const groups = useMemo(() => groupByKeyword(results), [results]);
 
   return (
@@ -173,6 +177,7 @@ export function ExposureStatus({ clientName, results, runs, selectedRunId, onSel
           <KeywordCard
             key={keywordId}
             clientName={clientName}
+            clientType={clientType}
             keywordText={group[0].keywords.text}
             results={group}
           />

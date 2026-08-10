@@ -6,6 +6,7 @@ export type ClientReportData = {
   client: {
     id: string;
     name: string;
+    client_type: "hospital" | "business";
     region: string | null;
     department: string | null;
     director_name: string | null;
@@ -23,7 +24,7 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
 
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, region, department, director_name, contact_email")
+    .select("id, name, client_type, region, department, director_name, contact_email")
     .eq("id", clientId)
     .single();
   if (clientError || !client) throw new Error(clientError?.message ?? "클라이언트를 찾을 수 없습니다.");

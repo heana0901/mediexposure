@@ -23,7 +23,7 @@ type Props = {
 
 const NAV_ITEMS: { key: Tab; label: string; Icon: (props: { className?: string }) => React.ReactElement; adminOnly?: boolean }[] = [
   { key: "status", label: "AI노출현황", Icon: IconEye },
-  { key: "competitors", label: "경쟁병원분석", Icon: IconBarChart },
+  { key: "competitors", label: "경쟁분석", Icon: IconBarChart },
   { key: "trends", label: "추이 분석", Icon: IconTrendingUp },
   { key: "usage", label: "비용 현황", Icon: IconCreditCard, adminOnly: true },
   { key: "accounts", label: "계정 관리", Icon: IconUsers, adminOnly: true },
@@ -87,8 +87,14 @@ export function Sidebar({
           <>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
               {selectedClient.department && <span>{selectedClient.department}</span>}
-              {selectedClient.director_name && <span>{selectedClient.director_name} 원장</span>}
-              {selectedClient.is_specialist !== null && (
+              {selectedClient.director_name && (
+                <span>
+                  {selectedClient.client_type === "hospital"
+                    ? `${selectedClient.director_name} 원장`
+                    : `대표 ${selectedClient.director_name}`}
+                </span>
+              )}
+              {selectedClient.client_type === "hospital" && selectedClient.is_specialist !== null && (
                 <span>{selectedClient.is_specialist ? "전문의" : "전문의 아님"}</span>
               )}
               {selectedClient.region && <span className="w-full">{selectedClient.region}</span>}

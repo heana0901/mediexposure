@@ -24,6 +24,7 @@ export function ReportPrintView({ data }: Props) {
       ? `${fmtDate(weeklyTrend[0].createdAt)} ~ ${fmtDate(weeklyTrend[weeklyTrend.length - 1].createdAt)}`
       : "최근 7일";
   const metaLine = [client.department, client.region].filter(Boolean).join(" · ");
+  const competitorLabel = client.client_type === "business" ? "경쟁업체" : "경쟁병원";
 
   return (
     <div
@@ -140,7 +141,7 @@ export function ReportPrintView({ data }: Props) {
       {competitorTop5.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#16202c", marginBottom: 10 }}>
-            경쟁병원 노출 빈도 TOP 5
+            {competitorLabel} 노출 빈도 TOP 5
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <tbody>
@@ -223,8 +224,8 @@ export function ReportPrintView({ data }: Props) {
                 </div>
                 <div style={{ fontSize: 12, color: "#8b95a3" }}>
                   {u.competitors.length > 0
-                    ? `대신 언급된 경쟁병원: ${u.competitors.slice(0, 5).join(", ")}${u.competitors.length > 5 ? " 외" : ""}`
-                    : "경쟁병원 언급 없이 미노출"}
+                    ? `대신 언급된 ${competitorLabel}: ${u.competitors.slice(0, 5).join(", ")}${u.competitors.length > 5 ? " 외" : ""}`
+                    : `${competitorLabel} 언급 없이 미노출`}
                 </div>
               </div>
             ))}

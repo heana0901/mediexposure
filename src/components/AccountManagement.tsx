@@ -302,12 +302,12 @@ function AutoReportSchedule({ clients }: { clients: Client[] }) {
     <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
       <div className="text-sm font-medium text-gray-700 mb-1">주간 리포트 자동 발송 예약</div>
       <div className="text-xs text-gray-400 mb-3">
-        매일 정기 모니터링(낮 12시) 후, 선택한 요일에 해당 병원의 수신 이메일로 리포트를 자동 발송합니다.
+        매일 정기 모니터링(낮 12시) 후, 선택한 요일에 해당 클라이언트의 수신 이메일로 리포트를 자동 발송합니다.
       </div>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-gray-400 border-b">
-            <th className="py-2 font-normal">병원명</th>
+            <th className="py-2 font-normal">클라이언트명</th>
             <th className="py-2 font-normal">수신 이메일</th>
             <th className="py-2 font-normal">사용 여부</th>
             <th className="py-2 font-normal">발송 요일</th>
