@@ -163,6 +163,15 @@ export function CompetitorAnalysis({
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
 
+  const topChatgpt = competitorFrequency.reduce<CompetitorFrequencyEntry | null>(
+    (best, c) => (c.chatgpt > 0 && (!best || c.chatgpt > best.chatgpt) ? c : best),
+    null
+  );
+  const topGemini = competitorFrequency.reduce<CompetitorFrequencyEntry | null>(
+    (best, c) => (c.gemini > 0 && (!best || c.gemini > best.gemini) ? c : best),
+    null
+  );
+
   return (
     <div>
       <div className="flex gap-1.5 mb-4">
@@ -206,6 +215,42 @@ export function CompetitorAnalysis({
           </div>
 
           <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+            <div className="flex items-center gap-2 font-medium text-sm text-gray-700 mb-3">
+              <span className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                <IconTrendingUp className="w-4 h-4" />
+              </span>
+              제공자별 최다 노출 {competitorLabel}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: CHATGPT_COLOR }}>
+                  ChatGPT
+                </span>
+                {topChatgpt ? (
+                  <span className="text-sm text-gray-800 font-medium truncate">
+                    {topChatgpt.name} <span className="text-gray-400 font-normal">({topChatgpt.chatgpt}회)</span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-300">데이터 없음</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: GEMINI_COLOR }}>
+                  Gemini
+                </span>
+                {topGemini ? (
+                  <span className="text-sm text-gray-800 font-medium truncate">
+                    {topGemini.name} <span className="text-gray-400 font-normal">({topGemini.gemini}회)</span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-300">데이터 없음</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 md:col-span-2">
             <div className="flex items-center justify-between mb-3">
               <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
                 <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
