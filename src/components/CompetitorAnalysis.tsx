@@ -129,7 +129,9 @@ function ContentSuggestions({ clientId }: { clientId: string }) {
       </div>
       {error && <div className="text-xs text-red-500">{error}</div>}
       {suggestions ? (
-        <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{suggestions}</div>
+        <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-1">
+          {suggestions}
+        </div>
       ) : (
         <div className="text-sm text-gray-400 py-4 text-center">
           미노출 키워드와 경쟁 현황을 바탕으로 보강하면 좋을 콘텐츠를 제안해드립니다
@@ -138,6 +140,14 @@ function ContentSuggestions({ clientId }: { clientId: string }) {
     </div>
   );
 }
+
+type SubTab = "frequency" | "unexposed" | "insights";
+
+const SUB_TABS: { key: SubTab; label: string }[] = [
+  { key: "frequency", label: "노출 빈도" },
+  { key: "unexposed", label: "미노출" },
+  { key: "insights", label: "인사이트" },
+];
 
 export function CompetitorAnalysis({
   clientId,
@@ -149,135 +159,158 @@ export function CompetitorAnalysis({
   totalResults,
   selfExposure,
 }: Props) {
+  const [subTab, setSubTab] = useState<SubTab>("frequency");
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
 
   return (
-    <div className="grid md:grid-cols-2 gap-6">
-      <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
-            <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <IconAlertTriangle className="w-4 h-4" />
-            </span>
-            미노출 (최근 7일)
-          </span>
-          <span className="text-xs text-gray-400">{unexposed.length}건</span>
-        </div>
-
-        {unexposed.length === 0 ? (
-          <div className="text-sm text-gray-400 py-8 text-center">미노출 항목이 없습니다</div>
-        ) : (
-          <div className="space-y-3">
-            {unexposed.map((r) => (
-              <UnexposedCard key={r.id} result={r} />
-            ))}
-          </div>
-        )}
+    <div>
+      <div className="flex gap-1.5 mb-4">
+        {SUB_TABS.map((t) => (
+          <button
+            key={t.key}
+            className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+              subTab === t.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            onClick={() => setSubTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="space-y-6">
-        <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
-              <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <IconBuilding className="w-4 h-4" />
+      {subTab === "frequency" && (
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
+                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <IconBuilding className="w-4 h-4" />
+                </span>
+                {clientName} 노출 빈도
               </span>
-              {clientName} 노출 빈도
-            </span>
-            <span className="text-xs text-gray-400">전체 {selfExposure.total}건 기준</span>
+              <span className="text-xs text-gray-400">전체 {selfExposure.total}건 기준</span>
+            </div>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl font-semibold text-blue-600">{selfExposure.count}회</span>
+              <span className="text-sm text-gray-400">({selfRate}%)</span>
+            </div>
+            <div className="flex gap-4 text-xs text-gray-500">
+              <span>
+                ChatGPT {selfExposure.chatgpt.count}/{selfExposure.chatgpt.total}회
+              </span>
+              <span>
+                Gemini {selfExposure.gemini.count}/{selfExposure.gemini.total}회
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl font-semibold text-blue-600">{selfExposure.count}회</span>
-            <span className="text-sm text-gray-400">({selfRate}%)</span>
-          </div>
-          <div className="flex gap-4 text-xs text-gray-500">
-            <span>
-              ChatGPT {selfExposure.chatgpt.count}/{selfExposure.chatgpt.total}회
-            </span>
-            <span>
-              Gemini {selfExposure.gemini.count}/{selfExposure.gemini.total}회
-            </span>
+
+          <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
+                <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <IconTrendingUp className="w-4 h-4" />
+                </span>
+                {competitorLabel} 노출 빈도
+              </span>
+              <span className="text-xs text-gray-400">전체 {totalResults}건 기준</span>
+            </div>
+
+            {competitorFrequency.length === 0 ? (
+              <div className="text-sm text-gray-400 py-8 text-center">데이터가 없습니다</div>
+            ) : (
+              <ol className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {competitorFrequency.slice(0, 10).map((c, i) => (
+                  <li key={c.name} className="flex items-center gap-3 text-sm">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs shrink-0">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 text-gray-700 truncate">{c.name}</span>
+                    <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
+                        {c.chatgpt}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
+                        {c.gemini}
+                      </span>
+                      <span className="text-gray-400">총 {c.total}회</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         </div>
+      )}
 
+      {subTab === "unexposed" && (
         <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
-              <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <IconTrendingUp className="w-4 h-4" />
+              <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <IconAlertTriangle className="w-4 h-4" />
               </span>
-              {competitorLabel} 노출 빈도
+              미노출 (최근 3일)
             </span>
-            <span className="text-xs text-gray-400">전체 {totalResults}건 기준</span>
+            <span className="text-xs text-gray-400">{unexposed.length}건</span>
           </div>
 
-          {competitorFrequency.length === 0 ? (
-            <div className="text-sm text-gray-400 py-8 text-center">데이터가 없습니다</div>
+          {unexposed.length === 0 ? (
+            <div className="text-sm text-gray-400 py-8 text-center">미노출 항목이 없습니다</div>
           ) : (
-            <ol className="space-y-2">
-              {competitorFrequency.slice(0, 10).map((c, i) => (
-                <li key={c.name} className="flex items-center gap-3 text-sm">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs shrink-0">
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 text-gray-700 truncate">{c.name}</span>
-                  <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
-                      {c.chatgpt}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
-                      {c.gemini}
-                    </span>
-                    <span className="text-gray-400">총 {c.total}회</span>
-                  </span>
-                </li>
+            <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+              {unexposed.map((r) => (
+                <UnexposedCard key={r.id} result={r} />
               ))}
-            </ol>
+            </div>
           )}
         </div>
+      )}
 
-        <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
-              <span className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                <IconLink className="w-4 h-4" />
+      {subTab === "insights" && (
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="flex items-center gap-2 font-medium text-sm text-gray-700">
+                <span className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                  <IconLink className="w-4 h-4" />
+                </span>
+                AI 인용 출처 TOP 10
               </span>
-              AI 인용 출처 TOP 10
-            </span>
+            </div>
+
+            {sourceFrequency.length === 0 ? (
+              <div className="text-sm text-gray-400 py-8 text-center">인용된 출처가 없습니다</div>
+            ) : (
+              <ol className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {sourceFrequency.map((s, i) => (
+                  <li key={s.domain} className="flex items-center gap-3 text-sm">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-sky-600 text-white text-xs shrink-0">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 text-gray-700 truncate">{s.domain}</span>
+                    <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
+                        {s.chatgpt}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
+                        {s.gemini}
+                      </span>
+                      <span className="text-gray-400">총 {s.total}회</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
 
-          {sourceFrequency.length === 0 ? (
-            <div className="text-sm text-gray-400 py-8 text-center">인용된 출처가 없습니다</div>
-          ) : (
-            <ol className="space-y-2">
-              {sourceFrequency.map((s, i) => (
-                <li key={s.domain} className="flex items-center gap-3 text-sm">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-sky-600 text-white text-xs shrink-0">
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 text-gray-700 truncate">{s.domain}</span>
-                  <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
-                      {s.chatgpt}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
-                      {s.gemini}
-                    </span>
-                    <span className="text-gray-400">총 {s.total}회</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <ContentSuggestions clientId={clientId} />
         </div>
-
-        <ContentSuggestions clientId={clientId} />
-      </div>
+      )}
     </div>
   );
 }

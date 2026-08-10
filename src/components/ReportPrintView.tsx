@@ -66,7 +66,7 @@ export function ReportPrintView({ data }: Props) {
           </div>
         </div>
         <div style={{ flex: 1, border: "1px solid #e8ebef", borderRadius: 10, padding: 16 }}>
-          <div style={{ fontSize: 12, color: "#8b95a3", marginBottom: 6 }}>미노출 키워드 (최근 7일)</div>
+          <div style={{ fontSize: 12, color: "#8b95a3", marginBottom: 6 }}>미노출 키워드 (최근 3일)</div>
           <div style={{ fontSize: 26, fontWeight: 700, color: "#16202c" }}>{unexposedCount}건</div>
           <div style={{ fontSize: 12, color: "#8b95a3", marginTop: 6 }}>
             전체 {selfExposure.total}건 기준

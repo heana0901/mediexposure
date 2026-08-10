@@ -39,8 +39,8 @@ export async function GET(request: Request) {
 
   const allResults = results ?? [];
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const unexposed = allResults.filter((r) => !r.mentioned && new Date(r.created_at) >= sevenDaysAgo);
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const unexposed = allResults.filter((r) => !r.mentioned && new Date(r.created_at) >= threeDaysAgo);
 
   const frequency = new Map<string, { chatgpt: number; gemini: number }>();
   for (const r of allResults) {

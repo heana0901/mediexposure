@@ -100,7 +100,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
         </td>
         <td width="4%"></td>
         <td style="border:1px solid ${LINE};border-radius:10px;padding:16px;" width="48%">
-          <div style="font-size:12px;color:${MUTED};margin-bottom:6px;">미노출 키워드 (최근 7일)</div>
+          <div style="font-size:12px;color:${MUTED};margin-bottom:6px;">미노출 키워드 (최근 3일)</div>
           <div style="font-size:26px;font-weight:700;color:${INK};">${unexposedCount}건</div>
           <div style="font-size:12px;color:${MUTED};margin-top:6px;">전체 ${selfExposure.total}건 기준</div>
         </td>

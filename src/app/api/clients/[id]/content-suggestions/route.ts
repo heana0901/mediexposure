@@ -39,8 +39,8 @@ export async function POST(
   if (resultsError) return NextResponse.json({ error: resultsError.message }, { status: 500 });
 
   const allResults = results ?? [];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const unexposed = allResults.filter((r) => !r.mentioned && new Date(r.created_at) >= sevenDaysAgo);
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const unexposed = allResults.filter((r) => !r.mentioned && new Date(r.created_at) >= threeDaysAgo);
 
   const competitorCount = new Map<string, number>();
   for (const r of allResults) {
@@ -54,7 +54,7 @@ export async function POST(
     .map(([name]) => name);
 
   if (unexposed.length === 0) {
-    return NextResponse.json({ suggestions: "최근 7일간 미노출 항목이 없습니다. 지금 콘텐츠 전략이 잘 작동하고 있습니다." });
+    return NextResponse.json({ suggestions: "최근 3일간 미노출 항목이 없습니다. 지금 콘텐츠 전략이 잘 작동하고 있습니다." });
   }
 
   const unexposedKeywords = Array.from(new Set(unexposed.map((r) => keywordTextById.get(r.keyword_id) ?? ""))).filter(
@@ -64,7 +64,7 @@ export async function POST(
 
   const prompt = `${subject}명: ${client.name}${client.department ? ` (${client.department})` : ""}
 
-최근 7일간 AI 검색에서 노출되지 않은 질문 목록:
+최근 3일간 AI 검색에서 노출되지 않은 질문 목록:
 ${unexposedKeywords.map((k) => `- ${k}`).join("\n")}
 
 같은 질문들에서 대신 자주 언급된 경쟁 ${subject}:
