@@ -12,6 +12,7 @@ import type {
   AppUserInput,
 } from "./types";
 import type { ClientReportData } from "./reportData";
+import type { SiteAuditResult } from "./siteAudit";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -142,4 +143,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled, day }),
     }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
+
+  runSiteAudit: (url: string) =>
+    fetch("/api/site-audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).then((r) => json<SiteAuditResult>(r)),
 };

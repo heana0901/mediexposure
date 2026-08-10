@@ -1,9 +1,9 @@
 "use client";
 
 import type { Client } from "@/lib/types";
-import { IconEye, IconBarChart, IconTrendingUp, IconCreditCard, IconUsers } from "./icons";
+import { IconEye, IconBarChart, IconTrendingUp, IconCreditCard, IconUsers, IconGlobe } from "./icons";
 
-export type Tab = "status" | "competitors" | "trends" | "usage" | "accounts";
+export type Tab = "status" | "competitors" | "trends" | "siteaudit" | "usage" | "accounts";
 
 type Props = {
   clients: Client[];
@@ -25,6 +25,7 @@ const NAV_ITEMS: { key: Tab; label: string; Icon: (props: { className?: string }
   { key: "status", label: "AI노출현황", Icon: IconEye },
   { key: "competitors", label: "경쟁분석", Icon: IconBarChart },
   { key: "trends", label: "추이 분석", Icon: IconTrendingUp },
+  { key: "siteaudit", label: "홈페이지 분석", Icon: IconGlobe },
   { key: "usage", label: "비용 현황", Icon: IconCreditCard, adminOnly: true },
   { key: "accounts", label: "계정 관리", Icon: IconUsers, adminOnly: true },
 ];

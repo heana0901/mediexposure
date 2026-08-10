@@ -24,6 +24,7 @@ import { TrendChart } from "./TrendChart";
 import { UsageDashboard } from "./UsageDashboard";
 import { AccountManagement } from "./AccountManagement";
 import { ReportPrintView } from "./ReportPrintView";
+import { SiteAudit } from "./SiteAudit";
 
 type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
 
@@ -31,6 +32,7 @@ const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
   status: { title: "AI 노출현황", subtitle: "클라이언트별 AI 검색 노출도를 모니터링합니다" },
   competitors: { title: "경쟁분석", subtitle: "미노출 항목과 경쟁사 언급 빈도를 분석합니다" },
   trends: { title: "추이 분석", subtitle: "모니터링 실행 기록에 따른 언급률 변화를 확인합니다" },
+  siteaudit: { title: "홈페이지 분석", subtitle: "홈페이지가 AI 검색엔진에 얼마나 잘 노출될 수 있는지 진단합니다" },
   usage: { title: "비용 현황", subtitle: "API 호출 횟수와 예상 비용을 확인합니다" },
   accounts: { title: "계정 관리", subtitle: "로그인 계정과 클라이언트 접근 권한을 관리합니다" },
 };
@@ -283,7 +285,7 @@ export function Dashboard() {
               <p className="text-sm text-gray-500">{subtitle}</p>
             </div>
 
-            {selectedClientId && tab !== "usage" && tab !== "accounts" && (
+            {selectedClientId && tab !== "usage" && tab !== "accounts" && tab !== "siteaudit" && (
               <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <div className="flex gap-2">
                   <button
@@ -320,6 +322,8 @@ export function Dashboard() {
             <UsageDashboard usage={usage} />
           ) : tab === "accounts" ? (
             <AccountManagement clients={clients} currentUsername={me?.username ?? null} />
+          ) : tab === "siteaudit" ? (
+            <SiteAudit />
           ) : !selectedClientId ? (
             <div className="border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="font-medium text-gray-600">클라이언트를 선택해주세요</div>
