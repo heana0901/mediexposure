@@ -48,6 +48,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
     toSpecialistOption(client?.is_specialist)
   );
   const [contactEmail, setContactEmail] = useState(client?.contact_email ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(client?.website_url ?? "");
   const [saving, setSaving] = useState(false);
 
   const labels = TYPE_LABELS[clientType];
@@ -64,6 +65,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         director_name: directorName.trim() || undefined,
         is_specialist: clientType === "hospital" ? (isSpecialist === "unknown" ? null : isSpecialist === "yes") : null,
         contact_email: contactEmail.trim() || undefined,
+        website_url: websiteUrl.trim() || undefined,
       });
       onClose();
     } finally {
@@ -158,6 +160,16 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
             placeholder="예: manager@example.com"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-gray-500 sm:col-span-2">
+          홈페이지 URL (홈페이지 분석에서 재사용)
+          <input
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            placeholder="예: https://mystore.com"
           />
         </label>
       </div>

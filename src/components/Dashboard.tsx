@@ -139,6 +139,20 @@ export function Dashboard() {
     setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
+  async function handleUpdateClientWebsiteUrl(client: Client, url: string) {
+    const updated = await api.updateClient(client.id, {
+      name: client.name,
+      client_type: client.client_type,
+      region: client.region ?? undefined,
+      department: client.department ?? undefined,
+      director_name: client.director_name ?? undefined,
+      is_specialist: client.is_specialist,
+      contact_email: client.contact_email ?? undefined,
+      website_url: url || undefined,
+    });
+    setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
+
   async function handleDeleteClient() {
     if (!selectedClient) return;
     const confirmed = window.confirm(
@@ -326,7 +340,11 @@ export function Dashboard() {
           ) : tab === "accounts" ? (
             <AccountManagement clients={clients} currentUsername={me?.username ?? null} />
           ) : tab === "siteaudit" ? (
-            <SiteAudit />
+            <SiteAudit
+              savedClientName={selectedClient?.name ?? null}
+              savedUrl={selectedClient?.website_url ?? null}
+              onSaveUrl={selectedClient ? (url) => handleUpdateClientWebsiteUrl(selectedClient, url) : undefined}
+            />
           ) : !selectedClientId ? (
             <div className="border border-gray-100 rounded-xl bg-white shadow-sm flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="font-medium text-gray-600">클라이언트를 선택해주세요</div>

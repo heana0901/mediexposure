@@ -9,6 +9,7 @@ export type Client = {
   director_name: string | null;
   is_specialist: boolean | null;
   contact_email: string | null;
+  website_url: string | null;
   auto_report_enabled: boolean;
   auto_report_day: number | null;
   created_at: string;
@@ -22,6 +23,7 @@ export type ClientInput = {
   director_name?: string;
   is_specialist?: boolean | null;
   contact_email?: string;
+  website_url?: string;
 };
 
 export type Keyword = {

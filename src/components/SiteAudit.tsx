@@ -11,12 +11,40 @@ const STATUS_STYLE: Record<string, { badge: string; icon: string }> = {
   fail: { badge: "bg-red-50 text-red-500", icon: "✕" },
 };
 
-export function SiteAudit() {
-  const [url, setUrl] = useState("");
+type Props = {
+  savedClientName?: string | null;
+  savedUrl?: string | null;
+  onSaveUrl?: (url: string) => Promise<void>;
+};
+
+export function SiteAudit({ savedClientName = null, savedUrl = null, onSaveUrl }: Props) {
+  const [url, setUrl] = useState(savedUrl ?? "");
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SiteComparisonResult | null>(null);
+  const [savingUrl, setSavingUrl] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  // 선택된 클라이언트가 바뀌면(사이드바에서 다른 병원 선택) 그 병원에 저장된 URL로 초기화
+  const [syncedClientName, setSyncedClientName] = useState(savedClientName);
+  if (savedClientName !== syncedClientName) {
+    setSyncedClientName(savedClientName);
+    setUrl(savedUrl ?? "");
+    setResult(null);
+  }
+
+  async function handleSaveUrl() {
+    if (!onSaveUrl) return;
+    setSavingUrl(true);
+    try {
+      await onSaveUrl(url.trim());
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1500);
+    } finally {
+      setSavingUrl(false);
+    }
+  }
 
   function addCompetitorField() {
     if (competitorUrls.length >= 2) return;
@@ -52,11 +80,20 @@ export function SiteAudit() {
   return (
     <div className="space-y-4">
       <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <IconGlobe className="w-4 h-4" />
-          </span>
-          <span className="text-sm font-medium text-gray-700">홈페이지 URL 입력</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <IconGlobe className="w-4 h-4" />
+            </span>
+            <span className="text-sm font-medium text-gray-700">홈페이지 URL 입력</span>
+          </div>
+          {savedClientName && (
+            <span className="text-xs text-gray-400">
+              {savedUrl && url.trim() === savedUrl
+                ? `📌 ${savedClientName}에 저장된 홈페이지`
+                : `${savedClientName} 선택됨`}
+            </span>
+          )}
         </div>
         <div className="flex gap-2 mb-2">
           <input
@@ -65,6 +102,15 @@ export function SiteAudit() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
+          {onSaveUrl && (
+            <button
+              className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+              disabled={savingUrl || !url.trim() || url.trim() === savedUrl}
+              onClick={handleSaveUrl}
+            >
+              {savingUrl ? "저장 중..." : savedFlash ? "저장됨" : "이 URL 저장"}
+            </button>
+          )}
         </div>
 
         {competitorUrls.map((cUrl, i) => (
