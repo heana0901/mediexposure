@@ -162,15 +162,23 @@ export function CompetitorAnalysis({
   const [subTab, setSubTab] = useState<SubTab>("frequency");
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
+  const entityLabel = clientType === "hospital" ? "병원" : "업체";
 
-  const topChatgpt = competitorFrequency.reduce<CompetitorFrequencyEntry | null>(
-    (best, c) => (c.chatgpt > 0 && (!best || c.chatgpt > best.chatgpt) ? c : best),
-    null
-  );
-  const topGemini = competitorFrequency.reduce<CompetitorFrequencyEntry | null>(
-    (best, c) => (c.gemini > 0 && (!best || c.gemini > best.gemini) ? c : best),
-    null
-  );
+  type RankedEntity = { name: string; count: number; isSelf: boolean };
+
+  function topByProvider(provider: "chatgpt" | "gemini"): RankedEntity | null {
+    const candidates: RankedEntity[] = [
+      { name: clientName, count: selfExposure[provider].count, isSelf: true },
+      ...competitorFrequency.map((c) => ({ name: c.name, count: c[provider], isSelf: false })),
+    ];
+    return candidates.reduce<RankedEntity | null>(
+      (best, c) => (c.count > 0 && (!best || c.count > best.count) ? c : best),
+      null
+    );
+  }
+
+  const topChatgpt = topByProvider("chatgpt");
+  const topGemini = topByProvider("gemini");
 
   return (
     <div>
@@ -219,7 +227,7 @@ export function CompetitorAnalysis({
               <span className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
                 <IconTrendingUp className="w-4 h-4" />
               </span>
-              제공자별 최다 노출 {competitorLabel}
+              AI별 최다 노출 {entityLabel}
             </div>
 
             <div className="space-y-3">
@@ -228,8 +236,13 @@ export function CompetitorAnalysis({
                   ChatGPT
                 </span>
                 {topChatgpt ? (
-                  <span className="text-sm text-gray-800 font-medium truncate">
-                    {topChatgpt.name} <span className="text-gray-400 font-normal">({topChatgpt.chatgpt}회)</span>
+                  <span className="text-sm font-medium truncate">
+                    {topChatgpt.isSelf ? (
+                      <span className="text-blue-600">{topChatgpt.name} (우리{entityLabel})</span>
+                    ) : (
+                      <span className="text-gray-800">{topChatgpt.name}</span>
+                    )}{" "}
+                    <span className="text-gray-400 font-normal">({topChatgpt.count}회)</span>
                   </span>
                 ) : (
                   <span className="text-sm text-gray-300">데이터 없음</span>
@@ -240,8 +253,13 @@ export function CompetitorAnalysis({
                   Gemini
                 </span>
                 {topGemini ? (
-                  <span className="text-sm text-gray-800 font-medium truncate">
-                    {topGemini.name} <span className="text-gray-400 font-normal">({topGemini.gemini}회)</span>
+                  <span className="text-sm font-medium truncate">
+                    {topGemini.isSelf ? (
+                      <span className="text-blue-600">{topGemini.name} (우리{entityLabel})</span>
+                    ) : (
+                      <span className="text-gray-800">{topGemini.name}</span>
+                    )}{" "}
+                    <span className="text-gray-400 font-normal">({topGemini.count}회)</span>
                   </span>
                 ) : (
                   <span className="text-sm text-gray-300">데이터 없음</span>
