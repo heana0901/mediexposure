@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseServerClient } from "./supabase";
+import { getRecentRunIds, dedupeUnexposed } from "./recentUnexposed";
 import type { CompetitorFrequencyEntry, SelfExposure } from "./types";
 
 export type ClientReportData = {
@@ -49,8 +50,8 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
     .in("keyword_id", keywordIds);
   const allResults = results ?? [];
 
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-  const unexposedAll = allResults.filter((r) => !r.mentioned && new Date(r.created_at) >= threeDaysAgo);
+  const recentRunIds = await getRecentRunIds(supabase, clientId, 3);
+  const unexposedAll = dedupeUnexposed(allResults, recentRunIds);
 
   const frequency = new Map<string, { chatgpt: number; gemini: number }>();
   for (const r of allResults) {

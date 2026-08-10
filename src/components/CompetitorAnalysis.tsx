@@ -252,7 +252,7 @@ export function CompetitorAnalysis({
               <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                 <IconAlertTriangle className="w-4 h-4" />
               </span>
-              미노출 (최근 3일)
+              미노출 (최근 3회 실행)
             </span>
             <span className="text-xs text-gray-400">{unexposed.length}건</span>
           </div>

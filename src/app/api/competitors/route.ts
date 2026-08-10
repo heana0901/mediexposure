@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { assertClientAccess } from "@/lib/dal";
+import { getRecentRunIds, dedupeUnexposed } from "@/lib/recentUnexposed";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -39,8 +40,8 @@ export async function GET(request: Request) {
 
   const allResults = results ?? [];
 
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-  const unexposed = allResults.filter((r) => !r.mentioned && new Date(r.created_at) >= threeDaysAgo);
+  const recentRunIds = await getRecentRunIds(supabase, clientId, 3);
+  const unexposed = dedupeUnexposed(allResults, recentRunIds);
 
   const frequency = new Map<string, { chatgpt: number; gemini: number }>();
   for (const r of allResults) {
