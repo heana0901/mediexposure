@@ -99,6 +99,10 @@ function stripTags(html: string): string {
     .trim();
 }
 
+function checksToText(checks: Check[]): string {
+  return checks.map((c) => `- ${c.label}: [${c.status.toUpperCase()}] ${c.detail}`).join("\n");
+}
+
 async function buildChecklist(rawUrl: string): Promise<{ checklist: SiteChecklist; summaryForAi: string }> {
   const url = normalizeUrl(rawUrl);
   const parsed = new URL(url);
@@ -178,7 +182,12 @@ async function buildChecklist(rawUrl: string): Promise<{ checklist: SiteChecklis
   const summaryForAi = `URL: ${url}
 제목: ${title || "(없음)"}
 설명: ${description || "(없음)"}
-본문 일부: ${visibleText.slice(0, 1200)}`;
+
+체크리스트 결과:
+${checksToText(checks)}
+
+본문 일부:
+${visibleText.slice(0, 1500)}`;
 
   return { checklist: { url, finalUrl, title, checks }, summaryForAi };
 }
@@ -192,14 +201,30 @@ export async function runComparativeSiteAudit(rawUrls: string[]): Promise<SiteCo
     const isComparison = rawUrls.length > 1;
     const combinedSummary = results.map((r) => r.summaryForAi).join("\n\n---\n\n");
 
+    const singleSitePrompt = `너는 웹사이트가 ChatGPT, Gemini 같은 생성형 AI 검색엔진에 얼마나 잘 노출·인용될 수 있는지 진단하는 GEO(Generative Engine Optimization) 전문가다.
+
+아래 체크리스트 결과와 페이지 정보(제목/설명/본문)를 바탕으로 진단을 작성하라. 일반적인 SEO 조언이 아니라, 이 페이지의 실제 내용에 근거한 맞춤 진단이어야 한다.
+
+형식 (한국어, 마크다운 없이 일반 텍스트로):
+1. 가장 시급한 문제 2~3가지를 순서대로 짚되, 각 문제마다 "왜 문제인지"를 체크리스트 결과나 실제 페이지 내용(제목/설명 문구 등)을 직접 인용해서 구체적으로 설명하라.
+2. 문제마다 바로 적용 가능한 개선 방법을 제시하라. 가능하면 실제로 쓸 수 있는 예시 문구(예: 개선된 meta description 예시)나 구체적인 스키마 종류(예: MedicalOrganization, LocalBusiness)를 직접 제안하라.
+3. "콘텐츠를 보강하세요" 같은 추상적 조언 대신, 이 페이지에 어떤 내용을 추가하면 좋을지 구체적으로 제시하라.`;
+
+    const comparisonPrompt = `너는 여러 웹사이트가 ChatGPT, Gemini 같은 생성형 AI 검색엔진에 얼마나 잘 노출·인용될 수 있는지 비교 진단하는 GEO(Generative Engine Optimization) 전문가다. 첫 번째 사이트가 분석 대상(우리 사이트)이고 나머지는 경쟁사다.
+
+아래 각 사이트의 체크리스트 결과와 페이지 정보를 바탕으로, 일반적인 SEO 조언이 아니라 실제 데이터에 근거한 맞춤 비교 진단을 작성하라.
+
+형식 (한국어, 마크다운 없이 일반 텍스트로):
+1. 우리 사이트가 경쟁사 대비 구체적으로 어떤 체크 항목에서 뒤처지는지, 실제 체크리스트 결과 수치나 내용을 인용해서 짚어라.
+2. 경쟁사가 잘하고 있는 부분 중 우리 사이트가 따라할 만한 것을 구체적으로 제시하라.
+3. 문제마다 바로 적용 가능한 개선 방법을 실제 예시(문구, 스키마 종류 등)와 함께 제시하라.`;
+
     const completion = await openai.chat.completions.create({
       model: ANALYSIS_MODEL,
       messages: [
         {
           role: "system",
-          content: isComparison
-            ? "너는 여러 웹사이트가 ChatGPT나 Gemini 같은 AI 검색엔진에 얼마나 잘 노출/인용될 수 있는지 비교 진단하는 전문가다. 첫 번째 사이트가 분석 대상(우리 사이트)이고 나머지는 경쟁사다. 우리 사이트가 경쟁사 대비 어떤 점이 부족한지, 무엇을 개선해야 하는지 마케팅 담당자가 이해할 수 있도록 한국어로 4~5문장 이내로 간결하게 답하라."
-            : "너는 웹사이트가 ChatGPT나 Gemini 같은 AI 검색엔진에 얼마나 잘 노출/인용될 수 있는지 진단하는 전문가다. 아래 페이지 정보를 보고, 부족한 점과 개선 방향을 마케팅 담당자가 이해할 수 있도록 한국어로 3~4문장 이내로 간결하게 답하라.",
+          content: isComparison ? comparisonPrompt : singleSitePrompt,
         },
         { role: "user", content: combinedSummary },
       ],

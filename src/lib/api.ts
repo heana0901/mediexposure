@@ -151,10 +151,15 @@ export const api = {
       body: JSON.stringify({ enabled, day }),
     }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
 
-  runSiteAudit: (urls: string[]) =>
+  runSiteAudit: (urls: string[], clientId?: string) =>
     fetch("/api/site-audit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls }),
+      body: JSON.stringify({ urls, clientId }),
     }).then((r) => json<SiteComparisonResult>(r)),
+
+  getLatestSiteAudit: (clientId: string) =>
+    fetch(`/api/site-audit?clientId=${clientId}`).then((r) =>
+      json<{ urls: string[]; result: SiteComparisonResult; created_at: string } | null>(r)
+    ),
 };

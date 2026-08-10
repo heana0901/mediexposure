@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { SiteComparisonResult } from "@/lib/siteAudit";
 import { IconGlobe } from "./icons";
@@ -12,17 +12,19 @@ const STATUS_STYLE: Record<string, { badge: string; icon: string }> = {
 };
 
 type Props = {
+  clientId?: string | null;
   savedClientName?: string | null;
   savedUrl?: string | null;
   onSaveUrl?: (url: string) => Promise<void>;
 };
 
-export function SiteAudit({ savedClientName = null, savedUrl = null, onSaveUrl }: Props) {
+export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = null, onSaveUrl }: Props) {
   const [url, setUrl] = useState(savedUrl ?? "");
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SiteComparisonResult | null>(null);
+  const [resultDate, setResultDate] = useState<string | null>(null);
   const [savingUrl, setSavingUrl] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -31,8 +33,30 @@ export function SiteAudit({ savedClientName = null, savedUrl = null, onSaveUrl }
   if (savedClientName !== syncedClientName) {
     setSyncedClientName(savedClientName);
     setUrl(savedUrl ?? "");
+    setCompetitorUrls([]);
     setResult(null);
+    setResultDate(null);
   }
+
+  // 그 병원에 저장된 마지막 분석 기록을 불러온다 (새로 분석하기 전까지는 이 기록을 보여줌)
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+    api
+      .getLatestSiteAudit(clientId)
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        setResult(saved.result);
+        setResultDate(saved.created_at);
+        if (Array.isArray(saved.urls) && saved.urls.length > 1) {
+          setCompetitorUrls(saved.urls.slice(1));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
 
   async function handleSaveUrl() {
     if (!onSaveUrl) return;
@@ -66,8 +90,9 @@ export function SiteAudit({ savedClientName = null, savedUrl = null, onSaveUrl }
     setError(null);
     setResult(null);
     try {
-      const data = await api.runSiteAudit(urls);
+      const data = await api.runSiteAudit(urls, clientId ?? undefined);
       setResult(data);
+      setResultDate(new Date().toISOString());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -152,7 +177,14 @@ export function SiteAudit({ savedClientName = null, savedUrl = null, onSaveUrl }
       {result && (
         <>
           <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 overflow-x-auto">
-            <div className="text-sm font-medium text-gray-700 mb-3">AI 검색 노출 체크리스트</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-medium text-gray-700">AI 검색 노출 체크리스트</div>
+              {resultDate && (
+                <span className="text-xs text-gray-400">
+                  {new Date(resultDate).toLocaleString("ko-KR")} 분석
+                </span>
+              )}
+            </div>
 
             {!isComparison ? (
               <div className="space-y-2">

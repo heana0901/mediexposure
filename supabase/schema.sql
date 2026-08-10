@@ -61,7 +61,16 @@ create table if not exists user_clients (
   primary key (user_id, client_id)
 );
 
+create table if not exists site_audits (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  urls jsonb not null,
+  result jsonb not null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_keywords_client on keywords(client_id);
 create index if not exists idx_runs_client on monitoring_runs(client_id);
 create index if not exists idx_results_run on monitoring_results(run_id);
 create index if not exists idx_results_keyword on monitoring_results(keyword_id);
+create index if not exists idx_site_audits_client on site_audits(client_id);

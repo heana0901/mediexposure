@@ -341,6 +341,7 @@ export function Dashboard() {
             <AccountManagement clients={clients} currentUsername={me?.username ?? null} />
           ) : tab === "siteaudit" ? (
             <SiteAudit
+              clientId={selectedClientId}
               savedClientName={selectedClient?.name ?? null}
               savedUrl={selectedClient?.website_url ?? null}
               onSaveUrl={selectedClient ? (url) => handleUpdateClientWebsiteUrl(selectedClient, url) : undefined}
