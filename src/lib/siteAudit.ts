@@ -7,10 +7,15 @@ const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || "gpt-4o-mini";
 export type CheckStatus = "pass" | "warn" | "fail";
 export type Check = { key: string; label: string; status: CheckStatus; detail: string };
 
-export type SiteAuditResult = {
+export type SiteChecklist = {
   url: string;
   finalUrl: string;
+  title: string;
   checks: Check[];
+};
+
+export type SiteComparisonResult = {
+  sites: SiteChecklist[];
   aiComment: string | null;
 };
 
@@ -94,7 +99,7 @@ function stripTags(html: string): string {
     .trim();
 }
 
-export async function runSiteAudit(rawUrl: string): Promise<SiteAuditResult> {
+async function buildChecklist(rawUrl: string): Promise<{ checklist: SiteChecklist; summaryForAi: string }> {
   const url = normalizeUrl(rawUrl);
   const parsed = new URL(url);
 
@@ -119,7 +124,10 @@ export async function runSiteAudit(rawUrl: string): Promise<SiteAuditResult> {
       detail: `페이지를 불러오지 못했습니다: ${err instanceof Error ? err.message : String(err)}`,
     });
     checks.push(await checkRobots(parsed.origin));
-    return { url, finalUrl, checks, aiComment: null };
+    return {
+      checklist: { url, finalUrl, title: "", checks },
+      summaryForAi: `URL: ${url}\n(페이지를 불러오지 못함)`,
+    };
   }
 
   checks.push(await checkRobots(parsed.origin));
@@ -167,21 +175,33 @@ export async function runSiteAudit(rawUrl: string): Promise<SiteAuditResult> {
         }
   );
 
+  const summaryForAi = `URL: ${url}
+제목: ${title || "(없음)"}
+설명: ${description || "(없음)"}
+본문 일부: ${visibleText.slice(0, 1200)}`;
+
+  return { checklist: { url, finalUrl, title, checks }, summaryForAi };
+}
+
+export async function runComparativeSiteAudit(rawUrls: string[]): Promise<SiteComparisonResult> {
+  const results = await Promise.all(rawUrls.map((u) => buildChecklist(u)));
+  const sites = results.map((r) => r.checklist);
+
   let aiComment: string | null = null;
   try {
-    const summaryForAi = `제목: ${title || "(없음)"}
-설명: ${description || "(없음)"}
-본문 일부: ${visibleText.slice(0, 1500)}`;
+    const isComparison = rawUrls.length > 1;
+    const combinedSummary = results.map((r) => r.summaryForAi).join("\n\n---\n\n");
 
     const completion = await openai.chat.completions.create({
       model: ANALYSIS_MODEL,
       messages: [
         {
           role: "system",
-          content:
-            "너는 웹사이트가 ChatGPT나 Gemini 같은 AI 검색엔진에 얼마나 잘 노출/인용될 수 있는지 진단하는 전문가다. 아래 페이지 정보를 보고, 부족한 점과 개선 방향을 마케팅 담당자가 이해할 수 있도록 한국어로 3~4문장 이내로 간결하게 답하라.",
+          content: isComparison
+            ? "너는 여러 웹사이트가 ChatGPT나 Gemini 같은 AI 검색엔진에 얼마나 잘 노출/인용될 수 있는지 비교 진단하는 전문가다. 첫 번째 사이트가 분석 대상(우리 사이트)이고 나머지는 경쟁사다. 우리 사이트가 경쟁사 대비 어떤 점이 부족한지, 무엇을 개선해야 하는지 마케팅 담당자가 이해할 수 있도록 한국어로 4~5문장 이내로 간결하게 답하라."
+            : "너는 웹사이트가 ChatGPT나 Gemini 같은 AI 검색엔진에 얼마나 잘 노출/인용될 수 있는지 진단하는 전문가다. 아래 페이지 정보를 보고, 부족한 점과 개선 방향을 마케팅 담당자가 이해할 수 있도록 한국어로 3~4문장 이내로 간결하게 답하라.",
         },
-        { role: "user", content: summaryForAi },
+        { role: "user", content: combinedSummary },
       ],
     });
     aiComment = completion.choices[0]?.message?.content ?? null;
@@ -189,5 +209,5 @@ export async function runSiteAudit(rawUrl: string): Promise<SiteAuditResult> {
     aiComment = null;
   }
 
-  return { url, finalUrl, checks, aiComment };
+  return { sites, aiComment };
 }

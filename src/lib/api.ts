@@ -8,11 +8,12 @@ import type {
   UsageSummary,
   SelfExposure,
   CompetitorFrequencyEntry,
+  SourceFrequencyEntry,
   AppUser,
   AppUserInput,
 } from "./types";
 import type { ClientReportData } from "./reportData";
-import type { SiteAuditResult } from "./siteAudit";
+import type { SiteComparisonResult } from "./siteAudit";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -94,6 +95,7 @@ export const api = {
       json<{
         unexposed: (MonitoringResult & { keywords: { text: string } })[];
         competitorFrequency: CompetitorFrequencyEntry[];
+        sourceFrequency: SourceFrequencyEntry[];
         totalResults: number;
         selfExposure: SelfExposure;
       }>(r)
@@ -101,6 +103,11 @@ export const api = {
 
   analyzeResult: (id: string) =>
     fetch(`/api/results/${id}/analyze`, { method: "POST" }).then((r) => json<MonitoringResult>(r)),
+
+  getContentSuggestions: (clientId: string) =>
+    fetch(`/api/clients/${clientId}/content-suggestions`, { method: "POST" }).then((r) =>
+      json<{ suggestions: string }>(r)
+    ),
 
   getTrends: (clientId: string) =>
     fetch(`/api/trends?clientId=${clientId}`).then((r) => json<TrendPoint[]>(r)),
@@ -144,10 +151,10 @@ export const api = {
       body: JSON.stringify({ enabled, day }),
     }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
 
-  runSiteAudit: (url: string) =>
+  runSiteAudit: (urls: string[]) =>
     fetch("/api/site-audit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    }).then((r) => json<SiteAuditResult>(r)),
+      body: JSON.stringify({ urls }),
+    }).then((r) => json<SiteComparisonResult>(r)),
 };

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   const keywordIds = (keywords ?? []).map((k) => k.id);
   if (keywordIds.length === 0) {
-    return NextResponse.json({ unexposed: [], competitorFrequency: [], totalResults: 0 });
+    return NextResponse.json({ unexposed: [], competitorFrequency: [], sourceFrequency: [], totalResults: 0 });
   }
 
   const { data: results, error: resultsError } = await supabase
@@ -61,6 +61,36 @@ export async function GET(request: Request) {
     }))
     .sort((a, b) => b.total - a.total);
 
+  // Gemini grounding이 실제 출처 대신 반환하는 리다이렉트 도메인은 집계에서 제외
+  const IGNORED_SOURCE_DOMAINS = ["vertexaisearch.cloud.google.com"];
+
+  const sourceFrequencyMap = new Map<string, { chatgpt: number; gemini: number }>();
+  for (const r of allResults) {
+    for (const source of (r.sources as { title: string; url: string }[] | null) ?? []) {
+      let domain: string;
+      try {
+        domain = new URL(source.url).hostname.replace(/^www\./, "");
+      } catch {
+        continue;
+      }
+      if (IGNORED_SOURCE_DOMAINS.includes(domain)) continue;
+      const entry = sourceFrequencyMap.get(domain) ?? { chatgpt: 0, gemini: 0 };
+      if (r.provider === "chatgpt") entry.chatgpt += 1;
+      else entry.gemini += 1;
+      sourceFrequencyMap.set(domain, entry);
+    }
+  }
+
+  const sourceFrequency = Array.from(sourceFrequencyMap.entries())
+    .map(([domain, counts]) => ({
+      domain,
+      chatgpt: counts.chatgpt,
+      gemini: counts.gemini,
+      total: counts.chatgpt + counts.gemini,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10);
+
   const selfMentionCount = allResults.filter((r) => r.mentioned).length;
   const chatgptResults = allResults.filter((r) => r.provider === "chatgpt");
   const geminiResults = allResults.filter((r) => r.provider === "gemini");
@@ -68,6 +98,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     unexposed,
     competitorFrequency,
+    sourceFrequency,
     totalResults: allResults.length,
     selfExposure: {
       count: selfMentionCount,

@@ -66,6 +66,13 @@ export type CompetitorFrequencyEntry = {
   total: number;
 };
 
+export type SourceFrequencyEntry = {
+  domain: string;
+  chatgpt: number;
+  gemini: number;
+  total: number;
+};
+
 export type SelfExposure = {
   count: number;
   total: number;

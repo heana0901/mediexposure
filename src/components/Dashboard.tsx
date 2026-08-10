@@ -13,6 +13,7 @@ import type {
   UsageSummary,
   SelfExposure,
   CompetitorFrequencyEntry,
+  SourceFrequencyEntry,
 } from "@/lib/types";
 import { Sidebar, type Tab } from "./Sidebar";
 import { KeywordManager } from "./KeywordManager";
@@ -56,11 +57,13 @@ export function Dashboard() {
   const [competitorData, setCompetitorData] = useState<{
     unexposed: ResultWithKeyword[];
     competitorFrequency: CompetitorFrequencyEntry[];
+    sourceFrequency: SourceFrequencyEntry[];
     totalResults: number;
     selfExposure: SelfExposure;
   }>({
     unexposed: [],
     competitorFrequency: [],
+    sourceFrequency: [],
     totalResults: 0,
     selfExposure: { count: 0, total: 0, chatgpt: { count: 0, total: 0 }, gemini: { count: 0, total: 0 } },
   });
@@ -352,10 +355,12 @@ export function Dashboard() {
 
               {tab === "competitors" && (
                 <CompetitorAnalysis
+                  clientId={selectedClientId ?? ""}
                   clientName={selectedClient?.name ?? ""}
                   clientType={selectedClient?.client_type ?? "hospital"}
                   unexposed={competitorData.unexposed}
                   competitorFrequency={competitorData.competitorFrequency}
+                  sourceFrequency={competitorData.sourceFrequency}
                   totalResults={competitorData.totalResults}
                   selfExposure={competitorData.selfExposure}
                 />
