@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { SiteComparisonResult } from "@/lib/siteAudit";
-import { IconGlobe } from "./icons";
+import { IconGlobe, IconCheck, IconAlertTriangle, IconX, IconLoader, IconBookmark } from "./icons";
 
-const STATUS_STYLE: Record<string, { badge: string; icon: string }> = {
-  pass: { badge: "bg-green-50 text-green-600", icon: "✓" },
-  warn: { badge: "bg-amber-50 text-amber-600", icon: "!" },
-  fail: { badge: "bg-red-50 text-red-500", icon: "✕" },
+const STATUS_STYLE: Record<string, { badge: string; Icon: typeof IconCheck }> = {
+  pass: { badge: "bg-green-50 text-green-600", Icon: IconCheck },
+  warn: { badge: "bg-amber-50 text-amber-600", Icon: IconAlertTriangle },
+  fail: { badge: "bg-red-50 text-red-500", Icon: IconX },
 };
 
 type Props = {
@@ -113,10 +113,15 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
             <span className="text-sm font-medium text-gray-700">홈페이지 URL 입력</span>
           </div>
           {savedClientName && (
-            <span className="text-xs text-gray-400">
-              {savedUrl && url.trim() === savedUrl
-                ? `📌 ${savedClientName}에 저장된 홈페이지`
-                : `${savedClientName} 선택됨`}
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              {savedUrl && url.trim() === savedUrl ? (
+                <>
+                  <IconBookmark className="w-3 h-3 text-blue-500" />
+                  {savedClientName}에 저장된 홈페이지
+                </>
+              ) : (
+                `${savedClientName} 선택됨`
+              )}
             </span>
           )}
         </div>
@@ -129,7 +134,7 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
           />
           {onSaveUrl && (
             <button
-              className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+              className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.96] disabled:active:scale-100 transition-[transform,background-color] disabled:opacity-50 whitespace-nowrap shrink-0"
               disabled={savingUrl || !url.trim() || url.trim() === savedUrl}
               onClick={handleSaveUrl}
             >
@@ -147,7 +152,7 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
               onChange={(e) => updateCompetitorUrl(i, e.target.value)}
             />
             <button
-              className="text-xs text-gray-400 hover:text-red-500 px-2"
+              className="text-xs text-gray-400 hover:text-red-500 active:scale-[0.96] transition-[transform,color] px-2"
               onClick={() => removeCompetitorField(i)}
             >
               삭제
@@ -157,17 +162,21 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
 
         <div className="flex items-center justify-between mt-2">
           {competitorUrls.length < 2 ? (
-            <button className="text-xs text-blue-600 hover:text-blue-700" onClick={addCompetitorField}>
+            <button
+              className="text-xs text-blue-600 hover:text-blue-700 active:scale-[0.96] transition-transform"
+              onClick={addCompetitorField}
+            >
               + 비교할 경쟁사 URL 추가
             </button>
           ) : (
             <span />
           )}
           <button
-            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50 whitespace-nowrap"
+            className="flex items-center gap-1.5 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 active:scale-[0.96] disabled:active:scale-100 transition-[transform,background-color] disabled:opacity-50 whitespace-nowrap"
             disabled={!url.trim() || loading}
             onClick={handleAnalyze}
           >
+            {loading && <IconLoader className="w-3.5 h-3.5 animate-spin" />}
             {loading ? "분석 중..." : "분석 시작"}
           </button>
         </div>
@@ -176,7 +185,7 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
 
       {result && (
         <>
-          <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 overflow-x-auto">
+          <div className="animate-fade-in-up border border-gray-100 rounded-xl bg-white shadow-sm p-4 overflow-x-auto">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm font-medium text-gray-700">AI 검색 노출 체크리스트</div>
               {resultDate && (
@@ -193,9 +202,9 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
                   return (
                     <div key={check.key} className="flex items-start gap-3 border border-gray-100 rounded-lg p-3">
                       <span
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${style.badge}`}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${style.badge}`}
                       >
-                        {style.icon}
+                        <style.Icon className="w-3.5 h-3.5" />
                       </span>
                       <div>
                         <div className="text-sm font-medium text-gray-800">{check.label}</div>
@@ -212,8 +221,10 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
                     <th className="py-2 font-normal">항목</th>
                     {result.sites.map((s, i) => (
                       <th key={s.url} className="py-2 font-normal px-2 truncate max-w-[160px]">
-                        {i === 0 ? "🔵 " : ""}
-                        {s.title || s.url}
+                        <span className="inline-flex items-center gap-1.5">
+                          {i === 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+                          {s.title || s.url}
+                        </span>
                       </th>
                     ))}
                   </tr>
@@ -228,10 +239,10 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
                         return (
                           <td key={s.url} className="py-2.5 px-2">
                             <span
-                              className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-xs font-bold ${style.badge}`}
+                              className={`inline-flex w-6 h-6 rounded-full items-center justify-center ${style.badge}`}
                               title={c?.detail}
                             >
-                              {style.icon}
+                              <style.Icon className="w-3.5 h-3.5" />
                             </span>
                           </td>
                         );
@@ -244,7 +255,10 @@ export function SiteAudit({ clientId = null, savedClientName = null, savedUrl = 
           </div>
 
           {result.aiComment && (
-            <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+            <div
+              className="animate-fade-in-up border border-gray-100 rounded-xl bg-white shadow-sm p-4"
+              style={{ animationDelay: "100ms" }}
+            >
               <div className="text-sm font-medium text-gray-700 mb-2">
                 {isComparison ? "AI 검색 관점 비교 진단" : "AI 검색 관점 진단"}
               </div>
