@@ -62,7 +62,7 @@ export function Sidebar({
       <div className="px-4 pb-5 space-y-3">
         {isAdmin && (
           <button
-            className="w-full text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
+            className="w-full text-sm px-3 py-2 rounded-lg border border-gray-100 shadow-sm bg-white text-gray-700 hover:bg-blue-50 hover:border-blue-100 hover:text-blue-700 active:scale-[0.98] transition-[transform,background-color,border-color,color]"
             onClick={onOpenCreateForm}
           >
             + 클라이언트 추가
@@ -70,7 +70,7 @@ export function Sidebar({
         )}
 
         <select
-          className="w-full rounded-lg px-3 py-2 text-sm bg-white border border-gray-200 text-gray-900"
+          className="w-full rounded-lg px-3 py-2 text-sm bg-white border border-gray-100 shadow-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-colors"
           value={selectedClientId ?? ""}
           onChange={(e) => onSelectClient(e.target.value)}
         >
