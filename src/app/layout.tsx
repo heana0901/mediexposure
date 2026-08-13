@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Medi-Exposure",
+  title: "AI analytics",
   description: "AI 검색 노출 모니터링 대시보드",
 };
 

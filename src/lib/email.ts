@@ -23,7 +23,7 @@ export async function sendReportEmail(to: string, subject: string, html: string)
   }
 
   await getTransporter().sendMail({
-    from: `Medi-Exposure <${user}>`,
+    from: `AI analytics <${user}>`,
     to,
     subject,
     html,

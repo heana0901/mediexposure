@@ -41,10 +41,10 @@ export default function LoginPage() {
       >
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-lg shadow-blue-900/20 ring-1 ring-black/5">
-              M
+            <div className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs tracking-tight shadow-lg shadow-blue-900/20 ring-1 ring-black/5">
+              AI
             </div>
-            <div className="font-semibold text-base text-gray-900 tracking-tight">Medi-Exposure</div>
+            <div className="font-semibold text-base text-gray-900 tracking-tight">AI analytics</div>
           </div>
           <div className="mt-4 h-px bg-gradient-to-r from-blue-500/30 via-gray-200 to-transparent" />
         </div>

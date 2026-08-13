@@ -48,21 +48,21 @@ export function Sidebar({
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
   return (
-    <aside className="w-72 shrink-0 bg-[#111827] flex flex-col h-full text-slate-200">
+    <aside className="w-72 shrink-0 bg-white border-r border-gray-100 flex flex-col h-full text-gray-600">
       <div className="px-5 pt-6 pb-5 relative">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-blue-900/40 ring-1 ring-white/10">
-            M
+          <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs tracking-tight shadow-lg shadow-blue-900/20 ring-1 ring-black/5">
+            AI
           </div>
-          <div className="font-semibold text-sm text-white tracking-tight">Medi-Exposure</div>
+          <div className="font-semibold text-sm text-gray-900 tracking-tight">AI analytics</div>
         </div>
-        <div className="mt-5 h-px bg-gradient-to-r from-blue-500/40 via-slate-700/60 to-transparent" />
+        <div className="mt-5 h-px bg-gradient-to-r from-blue-500/30 via-gray-200 to-transparent" />
       </div>
 
       <div className="px-4 pb-5 space-y-3">
         {isAdmin && (
           <button
-            className="w-full text-sm px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-200 hover:bg-slate-800 transition-colors"
+            className="w-full text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
             onClick={onOpenCreateForm}
           >
             + 클라이언트 추가
@@ -70,7 +70,7 @@ export function Sidebar({
         )}
 
         <select
-          className="w-full rounded-lg px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-slate-100 [color-scheme:dark]"
+          className="w-full rounded-lg px-3 py-2 text-sm bg-white border border-gray-200 text-gray-900"
           value={selectedClientId ?? ""}
           onChange={(e) => onSelectClient(e.target.value)}
         >
@@ -86,7 +86,7 @@ export function Sidebar({
 
         {selectedClient && (
           <>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
               {selectedClient.department && <span>{selectedClient.department}</span>}
               {selectedClient.director_name && (
                 <span>
@@ -102,7 +102,7 @@ export function Sidebar({
             </div>
 
             <div className="flex gap-3 text-xs">
-              <button className="text-slate-400 hover:text-slate-100" onClick={onOpenEditForm}>
+              <button className="text-gray-500 hover:text-blue-600 transition-colors" onClick={onOpenEditForm}>
                 정보 수정
               </button>
             </div>
@@ -110,7 +110,7 @@ export function Sidebar({
         )}
 
         <button
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg shadow-blue-900/30 hover:brightness-110 transition disabled:opacity-40 disabled:shadow-none"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg shadow-blue-900/20 hover:brightness-110 active:scale-[0.98] disabled:active:scale-100 transition-[transform,filter] disabled:opacity-40 disabled:shadow-none"
           disabled={!canRun || isRunning}
           onClick={onRunMonitoring}
         >
@@ -124,12 +124,12 @@ export function Sidebar({
             key={key}
             className={`w-full flex items-center gap-3 text-sm px-3 py-2.5 rounded-lg text-left transition-colors ${
               tab === key
-                ? "bg-blue-600/15 text-white font-medium ring-1 ring-inset ring-blue-500/30"
-                : "text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
+                ? "bg-blue-600 text-white font-medium shadow-sm shadow-blue-600/20"
+                : "text-gray-500 hover:bg-blue-50 hover:text-blue-700"
             }`}
             onClick={() => onTabChange(key)}
           >
-            <span className={tab === key ? "text-blue-400" : "text-slate-500"}>
+            <span className={tab === key ? "text-white" : "text-gray-400"}>
               <Icon />
             </span>
             {label}
@@ -138,12 +138,12 @@ export function Sidebar({
       </nav>
 
       {username && (
-        <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between">
-          <span className="text-xs text-slate-400">
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+          <span className="text-xs text-gray-500">
             {username}
-            {isAdmin && <span className="ml-1 text-slate-500">(관리자)</span>}
+            {isAdmin && <span className="ml-1 text-gray-400">(관리자)</span>}
           </span>
-          <button className="text-xs text-slate-500 hover:text-slate-200" onClick={onLogout}>
+          <button className="text-xs text-gray-400 hover:text-gray-900 transition-colors" onClick={onLogout}>
             로그아웃
           </button>
         </div>

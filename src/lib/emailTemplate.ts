@@ -83,7 +83,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
   <div style="max-width:600px;margin:0 auto;padding:28px 20px 40px;">
 
     <div style="border-bottom:2px solid ${INK};padding-bottom:16px;margin-bottom:22px;">
-      <div style="font-size:12px;font-weight:600;color:${MUTED};letter-spacing:0.02em;margin-bottom:6px;">Medi-Exposure</div>
+      <div style="font-size:12px;font-weight:600;color:${MUTED};letter-spacing:0.02em;margin-bottom:6px;">AI analytics</div>
       <div style="font-size:20px;font-weight:800;color:${INK};">AI 노출 주간 리포트</div>
       <div style="font-size:13px;color:${MUTED};margin-top:8px;">${client.name}${metaLine ? ` · ${metaLine}` : ""} · ${period}</div>
     </div>
@@ -148,11 +148,11 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
     }
 
     <div style="border-top:1px solid ${LINE};padding-top:16px;font-size:11.5px;color:${MUTED};">
-      Medi-Exposure 대시보드에서 발송된 리포트입니다.
+      AI analytics 대시보드에서 발송된 리포트입니다.
     </div>
   </div>
 </body>
 </html>`;
 
-  return { subject: `[Medi-Exposure] ${client.name} 주간 리포트 (${period})`, html };
+  return { subject: `[AI analytics] ${client.name} 주간 리포트 (${period})`, html };
 }

@@ -39,7 +39,7 @@ export function ReportPrintView({ data }: Props) {
     >
       <div style={{ borderBottom: "2px solid #16202c", paddingBottom: 16, marginBottom: 24 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#8b95a3", marginBottom: 6 }}>
-          Medi-Exposure
+          AI analytics
         </div>
         <div style={{ fontSize: 22, fontWeight: 800, color: "#16202c" }}>AI 노출 주간 리포트</div>
         <div style={{ fontSize: 13, color: "#8b95a3", marginTop: 8 }}>
