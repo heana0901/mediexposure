@@ -32,11 +32,19 @@ function extractSources(response: OpenAI.Responses.Response): Source[] {
   return sources;
 }
 
-export async function askChatGPT(question: string): Promise<AiCallResult> {
+export async function askChatGPT(question: string, cityHint?: string | null): Promise<AiCallResult> {
   const model = process.env.OPENAI_MODEL || "gpt-4o";
   const response = await client.responses.create({
     model,
-    tools: [{ type: "web_search" }],
+    tools: [
+      {
+        type: "web_search",
+        search_context_size: "high",
+        ...(cityHint
+          ? { user_location: { type: "approximate", country: "KR", city: cityHint, timezone: "Asia/Seoul" } }
+          : {}),
+      },
+    ],
     input: question,
   });
 

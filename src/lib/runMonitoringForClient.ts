@@ -3,11 +3,12 @@ import { askChatGPT, type AiCallResult } from "./ai/chatgpt";
 import { askGemini } from "./ai/gemini";
 import { analyzeResponse, type AnalysisResult } from "./analysis";
 import { estimateCostUsd } from "./pricing";
+import { extractCityFromRegion } from "./location";
 import type { Provider } from "./types";
 
-async function runProvider(provider: Provider, question: string): Promise<AiCallResult> {
+async function runProvider(provider: Provider, question: string, cityHint: string | null): Promise<AiCallResult> {
   try {
-    return provider === "chatgpt" ? await askChatGPT(question) : await askGemini(question);
+    return provider === "chatgpt" ? await askChatGPT(question, cityHint) : await askGemini(question);
   } catch (err) {
     return {
       text: `[오류] ${provider} 호출 실패: ${err instanceof Error ? err.message : String(err)}`,
@@ -48,9 +49,10 @@ const PROVIDERS: Provider[] = ["chatgpt", "gemini"];
 
 export async function runMonitoringForClient(
   supabase: SupabaseClient,
-  client: { id: string; name: string; client_type?: "hospital" | "business" }
+  client: { id: string; name: string; client_type?: "hospital" | "business"; region?: string | null }
 ) {
   const clientType = client.client_type ?? "hospital";
+  const cityHint = extractCityFromRegion(client.region);
   const { data: keywords, error: keywordsError } = await supabase
     .from("keywords")
     .select("*")
@@ -70,7 +72,7 @@ export async function runMonitoringForClient(
   const resultsToInsert = await Promise.all(
     keywords.flatMap((keyword) =>
       PROVIDERS.map(async (provider) => {
-        const aiResult = await runProvider(provider, keyword.text);
+        const aiResult = await runProvider(provider, keyword.text, cityHint);
         const analysis = await safeAnalyze(aiResult.text, client.name, clientType);
 
         const providerCost = estimateCostUsd(
