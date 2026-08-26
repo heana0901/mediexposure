@@ -1,5 +1,5 @@
 import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
-import type { AiCallResult, Source } from "./chatgpt";
+import type { AiCallResult, AskOptions, Source } from "./chatgpt";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -18,21 +18,28 @@ function extractSources(response: GenerateContentResponse): Source[] {
   return sources;
 }
 
-export async function askGemini(question: string): Promise<AiCallResult> {
+export async function askGemini(question: string, options: AskOptions = {}): Promise<AiCallResult> {
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const response = await ai.models.generateContent({
     model,
     contents: question,
     config: {
       tools: [{ googleSearch: {} }],
+      ...(options.instructions ? { systemInstruction: options.instructions } : {}),
     },
   });
+
+  const grounding = response.candidates?.[0]?.groundingMetadata;
+  const searchQueries = grounding?.webSearchQueries ?? [];
+  const sources = extractSources(response);
 
   return {
     text: response.text ?? "",
     model,
     inputTokens: response.usageMetadata?.promptTokenCount ?? null,
     outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
-    sources: extractSources(response),
+    sources,
+    searched: searchQueries.length > 0 || sources.length > 0,
+    searchQueries,
   };
 }

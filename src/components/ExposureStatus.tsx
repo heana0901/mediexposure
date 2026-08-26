@@ -96,6 +96,9 @@ function KeywordCard({
                 <span className="text-red-400">미노출 1회</span>
               )}
             </div>
+            {r.searched === false && (
+              <div className="text-[11px] text-amber-600 mt-1">웹검색 미실행</div>
+            )}
           </button>
         ))}
       </div>
@@ -116,6 +119,17 @@ function KeywordCard({
                 className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-1"
               >
                 {c}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {(active.search_queries ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className="text-xs text-gray-500 mr-1">검색어:</span>
+            {(active.search_queries ?? []).map((q) => (
+              <span key={q} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-1">
+                {q}
               </span>
             ))}
           </div>

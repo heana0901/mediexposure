@@ -1,14 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { askChatGPT, type AiCallResult } from "./ai/chatgpt";
+import { askChatGPT, type AiCallResult, type AskOptions } from "./ai/chatgpt";
 import { askGemini } from "./ai/gemini";
+import { buildSearchInstructions, buildSearchQuestion } from "./ai/prompt";
 import { analyzeResponse, type AnalysisResult } from "./analysis";
 import { estimateCostUsd } from "./pricing";
-import { extractCityFromRegion } from "./location";
+import { extractLocationHint } from "./location";
 import type { Provider } from "./types";
 
-async function runProvider(provider: Provider, question: string, cityHint: string | null): Promise<AiCallResult> {
+async function runProvider(
+  provider: Provider,
+  question: string,
+  options: AskOptions
+): Promise<AiCallResult> {
   try {
-    return provider === "chatgpt" ? await askChatGPT(question, cityHint) : await askGemini(question);
+    return provider === "chatgpt" ? await askChatGPT(question, options) : await askGemini(question, options);
   } catch (err) {
     return {
       text: `[오류] ${provider} 호출 실패: ${err instanceof Error ? err.message : String(err)}`,
@@ -16,6 +21,8 @@ async function runProvider(provider: Provider, question: string, cityHint: strin
       inputTokens: null,
       outputTokens: null,
       sources: [],
+      searched: false,
+      searchQueries: [],
     };
   }
 }
@@ -47,12 +54,21 @@ function sumTokens(a: number | null, b: number | null): number | null {
 
 const PROVIDERS: Provider[] = ["chatgpt", "gemini"];
 
+/** 012 마이그레이션을 아직 실행하지 않은 DB에 넣을 수 있도록 검색 진단 필드를 뺀다. */
+function stripSearchDiagnostics(row: Record<string, unknown>): Record<string, unknown> {
+  const legacy = { ...row };
+  delete legacy.searched;
+  delete legacy.search_queries;
+  return legacy;
+}
+
 export async function runMonitoringForClient(
   supabase: SupabaseClient,
   client: { id: string; name: string; client_type?: "hospital" | "business"; region?: string | null }
 ) {
   const clientType = client.client_type ?? "hospital";
-  const cityHint = extractCityFromRegion(client.region);
+  const location = extractLocationHint(client.region);
+  const instructions = buildSearchInstructions(clientType);
   const { data: keywords, error: keywordsError } = await supabase
     .from("keywords")
     .select("*")
@@ -72,7 +88,8 @@ export async function runMonitoringForClient(
   const resultsToInsert = await Promise.all(
     keywords.flatMap((keyword) =>
       PROVIDERS.map(async (provider) => {
-        const aiResult = await runProvider(provider, keyword.text, cityHint);
+        const question = buildSearchQuestion(keyword.text, clientType, location);
+        const aiResult = await runProvider(provider, question, { instructions, location });
         const analysis = await safeAnalyze(aiResult.text, client.name, clientType);
 
         const providerCost = estimateCostUsd(
@@ -97,17 +114,31 @@ export async function runMonitoringForClient(
           output_tokens: sumTokens(aiResult.outputTokens, analysis.outputTokens),
           estimated_cost_usd: estimatedCostUsd,
           sources: aiResult.sources,
+          searched: aiResult.searched,
+          search_queries: aiResult.searchQueries,
         };
       })
     )
   );
 
-  const { data: insertedResults, error: insertError } = await supabase
-    .from("monitoring_results")
-    .insert(resultsToInsert)
-    .select();
+  const insertResults = (rows: Record<string, unknown>[]) =>
+    supabase.from("monitoring_results").insert(rows).select();
 
-  if (insertError) throw new Error(insertError.message);
+  const firstAttempt = await insertResults(resultsToInsert);
 
-  return { run, results: insertedResults, keywords };
+  // 012 마이그레이션 전이면 검색 진단 컬럼이 없다. 모니터링 자체는 계속되도록 빼고 다시 넣는다.
+  const needsLegacyInsert = Boolean(
+    firstAttempt.error && /searched|search_queries/.test(firstAttempt.error.message)
+  );
+  if (needsLegacyInsert) {
+    console.warn("검색 진단 컬럼이 없어 제외하고 저장합니다. 012 마이그레이션을 실행하세요.");
+  }
+
+  const attempt = needsLegacyInsert
+    ? await insertResults(resultsToInsert.map(stripSearchDiagnostics))
+    : firstAttempt;
+
+  if (attempt.error) throw new Error(attempt.error.message);
+
+  return { run, results: attempt.data, keywords };
 }
