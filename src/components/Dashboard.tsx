@@ -7,13 +7,13 @@ import type {
   Client,
   ClientInput,
   Keyword,
-  MonitoringResult,
   MonitoringRun,
   TrendPoint,
   UsageSummary,
   SelfExposure,
   CompetitorFrequencyEntry,
   SourceFrequencyEntry,
+  ResultWithKeyword,
 } from "@/lib/types";
 import { Sidebar, type Tab } from "./Sidebar";
 import { KeywordManager } from "./KeywordManager";
@@ -27,7 +27,7 @@ import { AccountManagement } from "./AccountManagement";
 import { ReportPrintView } from "./ReportPrintView";
 import { SiteAudit } from "./SiteAudit";
 
-type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
+
 
 const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
   status: { title: "AI 노출현황", subtitle: "클라이언트별 AI 검색 노출도를 모니터링합니다" },
@@ -198,7 +198,7 @@ export function Dashboard() {
       const keywordMap = new Map(data.keywords.map((k) => [k.id, k]));
       const withKeyword = data.results.map((r) => ({
         ...r,
-        keywords: { text: keywordMap.get(r.keyword_id)?.text ?? "" },
+        keywords: { text: (r.keyword_id ? keywordMap.get(r.keyword_id)?.text : null) ?? r.keyword_text ?? "" },
       }));
       setResults(withKeyword);
       setRuns((prev) => [data.run, ...prev]);

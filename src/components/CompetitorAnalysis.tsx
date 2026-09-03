@@ -4,15 +4,16 @@ import { useState } from "react";
 import type {
   ClientType,
   CompetitorFrequencyEntry,
-  MonitoringResult,
   Provider,
   SelfExposure,
   SourceFrequencyEntry,
+  ResultWithKeyword,
 } from "@/lib/types";
+import { keywordTextOf } from "@/lib/types";
 import { api } from "@/lib/api";
 import { IconAlertTriangle, IconBuilding, IconTrendingUp, IconLink } from "./icons";
 
-type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
+
 
 const PROVIDER_LABEL: Record<Provider, string> = {
   chatgpt: "ChatGPT",
@@ -61,7 +62,7 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
           >
             {PROVIDER_LABEL[result.provider]}
           </span>
-          <span className="text-gray-700">{result.keywords.text}</span>
+          <span className="text-gray-700">{keywordTextOf(result)}</span>
         </div>
         {!note && (
           <button

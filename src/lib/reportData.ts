@@ -2,6 +2,7 @@ import "server-only";
 import { getSupabaseServerClient } from "./supabase";
 import { getRecentRunIds, dedupeUnexposed } from "./recentUnexposed";
 import type { CompetitorFrequencyEntry, SelfExposure } from "./types";
+import { keywordTextOf } from "./types";
 
 export type ClientReportData = {
   client: {
@@ -78,7 +79,7 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
 
   const unexposedRecent = unexposedAll.slice(0, 8).map((r) => ({
     provider: r.provider as "chatgpt" | "gemini",
-    keyword: (r.keywords as unknown as { text: string })?.text ?? "",
+    keyword: keywordTextOf(r as unknown as { keywords?: { text: string } | null; keyword_text?: string | null }),
     competitors: (r.competitors as string[] | null) ?? [],
   }));
 

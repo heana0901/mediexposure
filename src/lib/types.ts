@@ -40,7 +40,9 @@ export type Source = { title: string; url: string };
 export type MonitoringResult = {
   id: string;
   run_id: string;
-  keyword_id: string;
+  keyword_id: string | null;
+  /** 질문이 지워져도 남는 질문 문구 사본 (013 마이그레이션) */
+  keyword_text: string | null;
   provider: Provider;
   mentioned: boolean;
   rank: number | null;
@@ -57,6 +59,17 @@ export type MonitoringResult = {
   search_queries: string[];
   created_at: string;
 };
+
+/** 결과 + 질문 조인. 질문이 지워졌으면 조인이 비므로 사본을 쓴다. */
+export type ResultWithKeyword = MonitoringResult & { keywords: { text: string } | null };
+
+/** 화면에 보여줄 질문 문구. 조인 → 사본 순으로 찾는다. */
+export function keywordTextOf(result: {
+  keywords?: { text: string } | null;
+  keyword_text?: string | null;
+}): string {
+  return result.keywords?.text ?? result.keyword_text ?? "(지워진 질문)";
+}
 
 export type MonitoringRun = {
   id: string;

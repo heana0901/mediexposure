@@ -20,8 +20,14 @@ create table if not exists keywords (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references clients(id) on delete cascade,
   text text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- 지운 질문은 실제로 삭제하지 않는다. 삭제하면 이 질문으로 쌓은 결과까지 사라진다.
+  deleted_at timestamptz
 );
+
+create index if not exists idx_keywords_client_active
+  on keywords (client_id)
+  where deleted_at is null;
 
 create table if not exists monitoring_runs (
   id uuid primary key default gen_random_uuid(),
@@ -32,7 +38,9 @@ create table if not exists monitoring_runs (
 create table if not exists monitoring_results (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references monitoring_runs(id) on delete cascade,
-  keyword_id uuid not null references keywords(id) on delete cascade,
+  -- 질문이 지워져도 결과는 남긴다 (연결만 끊고, 문구는 keyword_text에 복사해 둔다)
+  keyword_id uuid references keywords(id) on delete set null,
+  keyword_text text,
   provider text not null check (provider in ('chatgpt', 'gemini')),
   mentioned boolean not null default false,
   rank int,

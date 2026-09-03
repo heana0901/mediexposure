@@ -6,6 +6,7 @@ import { analyzeResponse, type AnalysisResult } from "./analysis";
 import { estimateCostUsd } from "./pricing";
 import { extractLocationHint } from "./location";
 import { describeAiError } from "./aiError";
+import { selectActiveKeywords } from "./keywords";
 import type { Provider } from "./types";
 
 /**
@@ -85,11 +86,20 @@ function sumTokens(a: number | null, b: number | null): number | null {
 
 const PROVIDERS: Provider[] = ["chatgpt", "gemini"];
 
-/** 012 마이그레이션을 아직 실행하지 않은 DB에 넣을 수 있도록 검색 진단 필드를 뺀다. */
-function stripSearchDiagnostics(row: Record<string, unknown>): Record<string, unknown> {
+/**
+ * 마이그레이션을 아직 실행하지 않은 DB에도 저장할 수 있게 두는 안전장치.
+ * 012는 searched·search_queries, 013은 keyword_text를 추가했다.
+ * 컬럼이 없다는 오류가 나면 그 컬럼만 빼고 다시 넣는다.
+ */
+const OPTIONAL_COLUMNS = ["searched", "search_queries", "keyword_text"] as const;
+
+function missingColumnsFrom(message: string): string[] {
+  return OPTIONAL_COLUMNS.filter((column) => message.includes(column));
+}
+
+function stripColumns(row: Record<string, unknown>, columns: string[]): Record<string, unknown> {
   const legacy = { ...row };
-  delete legacy.searched;
-  delete legacy.search_queries;
+  for (const column of columns) delete legacy[column];
   return legacy;
 }
 
@@ -100,10 +110,7 @@ export async function runMonitoringForClient(
   const clientType = client.client_type ?? "hospital";
   const location = extractLocationHint(client.region);
   const instructions = buildSearchInstructions(clientType);
-  const { data: keywords, error: keywordsError } = await supabase
-    .from("keywords")
-    .select("*")
-    .eq("client_id", client.id);
+  const { data: keywords, error: keywordsError } = await selectActiveKeywords(supabase, client.id);
 
   if (keywordsError) throw new Error(keywordsError.message);
   if (!keywords || keywords.length === 0) return null;
@@ -139,6 +146,8 @@ export async function runMonitoringForClient(
           row: {
             run_id: run.id,
             keyword_id: keyword.id,
+            // 질문이 나중에 지워져도 무엇을 물어본 결과인지 남기기 위한 사본
+            keyword_text: keyword.text,
             provider,
             mentioned: analysis.mentioned,
             rank: analysis.rank,
@@ -172,16 +181,16 @@ export async function runMonitoringForClient(
 
   const firstAttempt = await insertResults(resultsToInsert);
 
-  // 012 마이그레이션 전이면 검색 진단 컬럼이 없다. 모니터링 자체는 계속되도록 빼고 다시 넣는다.
-  const needsLegacyInsert = Boolean(
-    firstAttempt.error && /searched|search_queries/.test(firstAttempt.error.message)
-  );
-  if (needsLegacyInsert) {
-    console.warn("검색 진단 컬럼이 없어 제외하고 저장합니다. 012 마이그레이션을 실행하세요.");
+  // 아직 실행하지 않은 마이그레이션이 있으면 그 컬럼만 빼고 다시 넣는다.
+  const missing = firstAttempt.error ? missingColumnsFrom(firstAttempt.error.message) : [];
+  if (missing.length) {
+    console.warn(
+      `${missing.join(", ")} 컬럼이 없어 제외하고 저장합니다. 012·013 마이그레이션을 실행하세요.`
+    );
   }
 
-  const attempt = needsLegacyInsert
-    ? await insertResults(resultsToInsert.map(stripSearchDiagnostics))
+  const attempt = missing.length
+    ? await insertResults(resultsToInsert.map((row) => stripColumns(row, missing)))
     : firstAttempt;
 
   if (attempt.error) throw new Error(attempt.error.message);

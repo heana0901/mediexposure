@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ClientType, MonitoringResult, MonitoringRun, Provider } from "@/lib/types";
+import type { ClientType, MonitoringRun, Provider, ResultWithKeyword } from "@/lib/types";
+import { keywordTextOf } from "@/lib/types";
 import { IconEye, IconLink } from "./icons";
 
-type ResultWithKeyword = MonitoringResult & { keywords: { text: string } };
+
 
 type Props = {
   clientName: string;
@@ -23,9 +24,11 @@ const PROVIDER_LABEL: Record<Provider, string> = {
 function groupByKeyword(results: ResultWithKeyword[]) {
   const map = new Map<string, ResultWithKeyword[]>();
   for (const r of results) {
-    const list = map.get(r.keyword_id) ?? [];
+    // 질문이 지워진 결과는 keyword_id가 비므로 문구를 키로 삼는다
+    const key = r.keyword_id ?? `text:${keywordTextOf(r)}`;
+    const list = map.get(key) ?? [];
     list.push(r);
-    map.set(r.keyword_id, list);
+    map.set(key, list);
   }
   return Array.from(map.entries());
 }
@@ -192,7 +195,7 @@ export function ExposureStatus({ clientName, clientType, results, runs, selected
             key={keywordId}
             clientName={clientName}
             clientType={clientType}
-            keywordText={group[0].keywords.text}
+            keywordText={keywordTextOf(group[0])}
             results={group}
           />
         ))

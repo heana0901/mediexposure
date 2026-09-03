@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { assertClientAccess } from "@/lib/dal";
+import { selectActiveKeywords } from "@/lib/keywords";
 
 export async function GET(
   _request: Request,
@@ -11,11 +12,7 @@ export async function GET(
   if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
   const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("keywords")
-    .select("*")
-    .eq("client_id", id)
-    .order("created_at", { ascending: true });
+  const { data, error } = await selectActiveKeywords(supabase, id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { assertClientAccess } from "@/lib/dal";
+import { selectActiveKeywords } from "@/lib/keywords";
 import { getRecentRunIds, dedupeUnexposed } from "@/lib/recentUnexposed";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -26,7 +27,7 @@ export async function POST(
     return NextResponse.json({ error: "클라이언트를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const { data: keywords } = await supabase.from("keywords").select("id, text").eq("client_id", id);
+  const { data: keywords } = await selectActiveKeywords(supabase, id, "id, text");
   const keywordIds = (keywords ?? []).map((k) => k.id);
   if (keywordIds.length === 0) {
     return NextResponse.json({ suggestions: "등록된 모니터링 질문이 없어 제안을 생성할 수 없습니다." });
