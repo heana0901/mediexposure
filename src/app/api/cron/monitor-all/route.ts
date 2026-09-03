@@ -30,7 +30,9 @@ export async function GET(request: Request) {
       summary.push({
         clientId: client.id,
         clientName: client.name,
-        status: result ? `완료 (${result.results.length}건)` : "건너뜀 (등록된 질문 없음)",
+        status: result
+          ? `완료 (${result.results.length}건)${result.warnings.length ? ` · 경고: ${result.warnings.join(" / ")}` : ""}`
+          : "건너뜀 (등록된 질문 없음)",
       });
     } catch (err) {
       summary.push({

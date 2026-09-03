@@ -49,6 +49,7 @@ export function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runWarnings, setRunWarnings] = useState<string[]>([]);
   const [clientFormMode, setClientFormMode] = useState<"none" | "create" | "edit">("none");
   const [sendingReport, setSendingReport] = useState(false);
   const [reportMessage, setReportMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -191,6 +192,7 @@ export function Dashboard() {
     if (!selectedClientId) return;
     setIsRunning(true);
     setError(null);
+    setRunWarnings([]);
     try {
       const data = await api.runMonitoring(selectedClientId);
       const keywordMap = new Map(data.keywords.map((k) => [k.id, k]));
@@ -201,6 +203,8 @@ export function Dashboard() {
       setResults(withKeyword);
       setRuns((prev) => [data.run, ...prev]);
       setSelectedRunId(data.run.id);
+      // 일부 제공자만 실패한 경우: 결과는 저장하되 무엇이 빠졌는지 반드시 알려야 합니다.
+      setRunWarnings(data.warnings ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -332,6 +336,21 @@ export function Dashboard() {
           {error && (
             <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
               {error}
+            </div>
+          )}
+
+          {runWarnings.length > 0 && (
+            <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <div className="font-medium mb-1">일부 AI 응답을 받지 못했습니다</div>
+              <ul className="list-disc pl-4 space-y-0.5 text-xs leading-relaxed">
+                {runWarnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+              <div className="text-xs text-amber-600/80 mt-2">
+                해당 제공자의 결과는 &lsquo;미노출&rsquo;이 아니라 &lsquo;확인 실패&rsquo;입니다. 노출률 계산에서
+                실제보다 낮게 보일 수 있습니다.
+              </div>
             </div>
           )}
 

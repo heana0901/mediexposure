@@ -13,7 +13,7 @@ import type {
   AppUserInput,
 } from "./types";
 import type { ClientReportData } from "./reportData";
-import type { SiteComparisonResult } from "./siteAudit";
+import type { SiteComparisonResult } from "./diagnose-shared";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -76,7 +76,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
     }).then((r) =>
-      json<{ run: MonitoringRun; results: MonitoringResult[]; keywords: Keyword[] }>(r)
+      json<{ run: MonitoringRun; results: MonitoringResult[]; keywords: Keyword[]; warnings?: string[] }>(r)
     ),
 
   listRuns: (clientId: string) =>

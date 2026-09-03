@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
+/*
+ * 이 앱의 화면은 전부 밝은 테마로 고정되어 있습니다 (흰 카드 + text-gray-*).
+ * 예전에는 prefers-color-scheme: dark일 때 --foreground를 흰색으로 바꿨는데,
+ * 색을 직접 지정하지 않는 input이 그 흰색을 물려받아 흰 배경에 흰 글씨가 됐습니다.
+ * 그래서 color-scheme을 light로 못 박고 다크 오버라이드를 두지 않습니다.
+ */
 :root {
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -11,17 +18,22 @@
   --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* 입력창은 상속에 맡기지 않고 색을 직접 지정합니다. */
+input,
+textarea,
+select {
+  color: #1f2937;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
 }
 
 @keyframes fadeInUp {
