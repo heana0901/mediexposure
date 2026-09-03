@@ -1,27 +1,30 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { askChatGPT, type AiCallResult } from "./ai/chatgpt";
+import { askChatGPT, type AiCallResult, type AskOptions } from "./ai/chatgpt";
 import { askGemini } from "./ai/gemini";
+import { buildSearchInstructions, buildSearchQuestion } from "./ai/prompt";
 import { analyzeResponse, type AnalysisResult } from "./analysis";
 import { estimateCostUsd } from "./pricing";
-import { extractCityFromRegion } from "./location";
+import { extractLocationHint } from "./location";
 import { describeAiError } from "./aiError";
 import type { Provider } from "./types";
 
 /**
  * AI 호출 결과. failure가 채워져 있으면 "AI가 언급하지 않았다"가 아니라
- * "물어보지도 못했다"는 뜻입니다. 이 둘을 구분하지 않으면 크레딧이 떨어졌을 때
- * 노출률 0%가 실제 성과처럼 기록됩니다.
+ * "물어보지도 못했다"는 뜻이다. 이 둘을 구분하지 않으면 크레딧이 떨어졌을 때
+ * 노출률 0%가 실제 성과처럼 기록된다.
  */
 type ProviderOutcome = AiCallResult & { failure: string | null };
 
 async function runProvider(
   provider: Provider,
   question: string,
-  cityHint: string | null
+  options: AskOptions
 ): Promise<ProviderOutcome> {
   try {
     const result =
-      provider === "chatgpt" ? await askChatGPT(question, cityHint) : await askGemini(question);
+      provider === "chatgpt"
+        ? await askChatGPT(question, options)
+        : await askGemini(question, options);
     return { ...result, failure: null };
   } catch (err) {
     const failure = describeAiError(err, provider);
@@ -32,6 +35,8 @@ async function runProvider(
       inputTokens: null,
       outputTokens: null,
       sources: [],
+      searched: false,
+      searchQueries: [],
       failure,
     };
   }
@@ -57,6 +62,7 @@ async function safeAnalyze(
   }
 }
 
+/** 호출 자체가 실패한 건은 분석에 돈을 더 쓰지 않고 빈 결과로 둔다. */
 function emptyAnalysis(): AnalysisResult {
   return {
     mentioned: false,
@@ -79,12 +85,21 @@ function sumTokens(a: number | null, b: number | null): number | null {
 
 const PROVIDERS: Provider[] = ["chatgpt", "gemini"];
 
+/** 012 마이그레이션을 아직 실행하지 않은 DB에 넣을 수 있도록 검색 진단 필드를 뺀다. */
+function stripSearchDiagnostics(row: Record<string, unknown>): Record<string, unknown> {
+  const legacy = { ...row };
+  delete legacy.searched;
+  delete legacy.search_queries;
+  return legacy;
+}
+
 export async function runMonitoringForClient(
   supabase: SupabaseClient,
   client: { id: string; name: string; client_type?: "hospital" | "business"; region?: string | null }
 ) {
   const clientType = client.client_type ?? "hospital";
-  const cityHint = extractCityFromRegion(client.region);
+  const location = extractLocationHint(client.region);
+  const instructions = buildSearchInstructions(clientType);
   const { data: keywords, error: keywordsError } = await supabase
     .from("keywords")
     .select("*")
@@ -104,8 +119,8 @@ export async function runMonitoringForClient(
   const outcomes = await Promise.all(
     keywords.flatMap((keyword) =>
       PROVIDERS.map(async (provider) => {
-        const aiResult = await runProvider(provider, keyword.text, cityHint);
-        // 호출 자체가 실패했으면 분석에 돈을 더 쓰지 않습니다.
+        const question = buildSearchQuestion(keyword.text, clientType, location);
+        const aiResult = await runProvider(provider, question, { instructions, location });
         const analysis = aiResult.failure
           ? emptyAnalysis()
           : await safeAnalyze(aiResult.text, client.name, clientType);
@@ -134,6 +149,8 @@ export async function runMonitoringForClient(
             output_tokens: sumTokens(aiResult.outputTokens, analysis.outputTokens),
             estimated_cost_usd: estimatedCostUsd,
             sources: aiResult.sources,
+            searched: aiResult.searched,
+            search_queries: aiResult.searchQueries,
           },
         };
       })
@@ -142,18 +159,32 @@ export async function runMonitoringForClient(
 
   const failures = outcomes.map((o) => o.failure).filter((f): f is string => Boolean(f));
 
-  // 전부 실패했다면 노출률 0%짜리 가짜 기록을 남기지 않고 실행 자체를 되돌립니다.
+  // 전부 실패했다면 노출률 0%짜리 가짜 기록을 남기지 않고 실행 자체를 되돌린다.
   if (failures.length === outcomes.length) {
     await supabase.from("monitoring_runs").delete().eq("id", run.id);
     throw new Error(unique(failures).join(" / ") || "AI 호출에 모두 실패했습니다.");
   }
 
-  const { data: insertedResults, error: insertError } = await supabase
-    .from("monitoring_results")
-    .insert(outcomes.map((o) => o.row))
-    .select();
+  const resultsToInsert = outcomes.map((o) => o.row);
 
-  if (insertError) throw new Error(insertError.message);
+  const insertResults = (rows: Record<string, unknown>[]) =>
+    supabase.from("monitoring_results").insert(rows).select();
 
-  return { run, results: insertedResults, keywords, warnings: unique(failures) };
+  const firstAttempt = await insertResults(resultsToInsert);
+
+  // 012 마이그레이션 전이면 검색 진단 컬럼이 없다. 모니터링 자체는 계속되도록 빼고 다시 넣는다.
+  const needsLegacyInsert = Boolean(
+    firstAttempt.error && /searched|search_queries/.test(firstAttempt.error.message)
+  );
+  if (needsLegacyInsert) {
+    console.warn("검색 진단 컬럼이 없어 제외하고 저장합니다. 012 마이그레이션을 실행하세요.");
+  }
+
+  const attempt = needsLegacyInsert
+    ? await insertResults(resultsToInsert.map(stripSearchDiagnostics))
+    : firstAttempt;
+
+  if (attempt.error) throw new Error(attempt.error.message);
+
+  return { run, results: attempt.data, keywords, warnings: unique(failures) };
 }

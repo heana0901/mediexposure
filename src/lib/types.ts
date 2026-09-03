@@ -52,6 +52,9 @@ export type MonitoringResult = {
   output_tokens: number | null;
   estimated_cost_usd: number | null;
   sources: Source[];
+  /** AI가 실제로 웹 검색을 수행했는지(마이그레이션 이전 데이터는 null) */
+  searched: boolean | null;
+  search_queries: string[];
   created_at: string;
 };
 
