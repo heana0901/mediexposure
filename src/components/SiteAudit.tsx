@@ -15,6 +15,8 @@ import {
 } from "@/lib/diagnose-shared";
 import { IconGlobe, IconCheck, IconAlertTriangle, IconX, IconLoader, IconBookmark } from "./icons";
 import { SiteAuditHistory } from "./SiteAuditHistory";
+import { downloadSiteFixPdf } from "./SiteFixReport";
+import type { Client } from "@/lib/types";
 import { stripMarkdown } from "@/lib/text";
 import type { SiteAuditHistoryEntry } from "@/lib/types";
 
@@ -173,11 +175,14 @@ export function SiteAudit({
   savedClientName = null,
   savedUrl = null,
   onSaveUrl,
+  client = null,
 }: {
   clientId?: string | null;
   savedClientName?: string | null;
   savedUrl?: string | null;
   onSaveUrl?: (url: string) => Promise<void>;
+  /** 제작자용 요청서에 병원 정보(지역·진료과·별칭·블로그)를 채우는 데 쓴다 */
+  client?: Client | null;
 }) {
   const [url, setUrl] = useState(savedUrl ?? "");
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
@@ -190,6 +195,7 @@ export function SiteAudit({
   const [savedFlash, setSavedFlash] = useState(false);
   const [openAxis, setOpenAxis] = useState<Axis | "all">("all");
   const [history, setHistory] = useState<SiteAuditHistoryEntry[]>([]);
+  const [makingPdf, setMakingPdf] = useState(false);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 선택된 클라이언트가 바뀌면(사이드바에서 다른 병원 선택) 그 병원에 저장된 URL로 초기화
@@ -404,11 +410,44 @@ export function SiteAudit({
                 <div className="animate-fade-in-up border border-gray-100 rounded-xl bg-white shadow-sm p-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm font-medium text-gray-700">AI 검색 노출 종합 점수</div>
-                    {resultDate && (
-                      <span className="text-xs text-gray-400">
-                        {new Date(resultDate).toLocaleString("ko-KR")} 분석
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {resultDate && (
+                        <span className="text-xs text-gray-400">
+                          {new Date(resultDate).toLocaleString("ko-KR")} 분석
+                        </span>
+                      )}
+                      {primary.checks.some((c) => c.status !== "pass") && (
+                        <button
+                          className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+                          disabled={makingPdf}
+                          title="홈페이지 제작·관리 담당자에게 전달할 작업 목록(예시 코드 포함)"
+                          onClick={async () => {
+                            setMakingPdf(true);
+                            try {
+                              await downloadSiteFixPdf(
+                                primary as SiteDiagnosis,
+                                {
+                                  hospitalName: client?.name ?? savedClientName ?? primary.title ?? "병원",
+                                  siteUrl: primary.finalUrl || primary.url,
+                                  region: client?.region ?? null,
+                                  department: client?.department ?? null,
+                                  aliases: client?.aliases ?? [],
+                                  naverBlogUrl: client?.naver_blog_url ?? null,
+                                  isClinic: /의원$/.test(client?.name ?? savedClientName ?? ""),
+                                },
+                                resultDate
+                              );
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : String(e));
+                            } finally {
+                              setMakingPdf(false);
+                            }
+                          }}
+                        >
+                          {makingPdf ? "만드는 중..." : "🛠 제작자용 수정 요청서 PDF"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     <ScoreDial score={primary.score} grade={primary.grade} />

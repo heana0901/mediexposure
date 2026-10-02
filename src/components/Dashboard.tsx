@@ -390,6 +390,7 @@ export function Dashboard() {
               clientId={selectedClientId}
               savedClientName={selectedClient?.name ?? null}
               savedUrl={selectedClient?.website_url ?? null}
+              client={selectedClient}
               onSaveUrl={selectedClient ? (url) => handleUpdateClientWebsiteUrl(selectedClient, url) : undefined}
             />
           ) : !selectedClientId ? (
