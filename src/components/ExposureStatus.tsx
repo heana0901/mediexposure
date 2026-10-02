@@ -40,7 +40,7 @@ function averageRank(samples: ResultWithKeyword[]): number | null {
   return Math.round((ranks.reduce((a, b) => a + b, 0) / ranks.length) * 10) / 10;
 }
 
-export function highlight(text: string, clientName: string) {
+function highlight(text: string, clientName: string) {
   if (!clientName) return text;
   const parts = text.split(clientName);
   return parts.flatMap((part, i) =>

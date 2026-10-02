@@ -82,25 +82,8 @@ create table if not exists site_audits (
   created_at timestamptz not null default now()
 );
 
--- 실제 AI 앱에서 사람이 검색한 답변 기록 (API 측정과 비교용)
-create table if not exists manual_checks (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid not null references clients(id) on delete cascade,
-  keyword_id uuid references keywords(id) on delete set null,
-  keyword_text text not null,
-  provider text not null check (provider in ('chatgpt', 'gemini', 'perplexity', 'claude')),
-  raw_response text not null,
-  mentioned boolean not null default false,
-  rank int,
-  competitors jsonb not null default '[]'::jsonb,
-  checked_at timestamptz not null default now(),
-  created_by text,
-  created_at timestamptz not null default now()
-);
-
 create index if not exists idx_keywords_client on keywords(client_id);
 create index if not exists idx_runs_client on monitoring_runs(client_id);
 create index if not exists idx_results_run on monitoring_results(run_id);
 create index if not exists idx_results_keyword on monitoring_results(keyword_id);
 create index if not exists idx_site_audits_client on site_audits(client_id);
-create index if not exists idx_manual_checks_client on manual_checks(client_id, checked_at desc);
