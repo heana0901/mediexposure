@@ -193,7 +193,7 @@ export async function downloadSiteFixPdf(diagnosis: SiteDiagnosis, ctx: FixConte
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-    const pdf = new jsPDF("p", "mm", "a4");
+    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
     const PAGE_W = 210;
     const PAGE_H = 297;
     const MARGIN = 10;
@@ -212,7 +212,7 @@ export async function downloadSiteFixPdf(diagnosis: SiteDiagnosis, ctx: FixConte
           pdf.addPage();
           y = MARGIN;
         }
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", MARGIN, y, contentW, blockH);
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", MARGIN, y, contentW, blockH);
         y += blockH;
         continue;
       }
@@ -229,7 +229,7 @@ export async function downloadSiteFixPdf(diagnosis: SiteDiagnosis, ctx: FixConte
           y = MARGIN;
         }
         const partH = part.height * mmPerPx;
-        pdf.addImage(part.toDataURL("image/png"), "PNG", MARGIN, y, contentW, partH);
+        pdf.addImage(part.toDataURL("image/jpeg", 0.85), "JPEG", MARGIN, y, contentW, partH);
         y += partH;
       }
     }

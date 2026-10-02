@@ -262,7 +262,7 @@ export function Dashboard() {
       ]);
 
       const canvas = await html2canvas(host.firstElementChild as HTMLElement, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.85);
 
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = 210;
@@ -272,12 +272,12 @@ export function Dashboard() {
       let heightLeft = imgHeight;
       let position = 0;
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
       while (heightLeft > 0) {
         position -= pageHeight;
         pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 

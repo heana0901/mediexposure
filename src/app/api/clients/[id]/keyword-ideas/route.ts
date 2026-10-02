@@ -84,6 +84,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const ideas: KeywordIdea[] = stats
     .filter((s) => !monitored.has(s.keyword))
+    // 입력한 단어 하나('안산', '허리')만으로 된 키워드는 질문으로 쓰기엔 너무 넓다
+    .filter((s) => !seedTokens.includes(s.keyword))
     .filter((s) => seedTokens.length === 0 || matchCount(s.keyword) > 0)
     .sort(
       (a, b) =>
