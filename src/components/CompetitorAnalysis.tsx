@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   ClientType,
   CompetitorFrequencyEntry,
@@ -11,7 +11,9 @@ import type {
   VisibilityMetrics,
   ExposureTally,
   DemandSummary,
+  ContentPlan,
 } from "@/lib/types";
+import { volumeLabel } from "@/lib/reportText";
 import { marginOfError, MIN_RELIABLE_SAMPLES, percent } from "@/lib/stats";
 import { keywordTextOf } from "@/lib/types";
 import { PROVIDER_META, PROVIDERS, providerKeys, type Provider } from "@/lib/providers";
@@ -213,23 +215,27 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
   );
 }
 
-function ContentSuggestions({ clientId }: { clientId: string }) {
-  const [suggestions, setSuggestions] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/** 콘텐츠 처방 요약. 자세한 페이지 설계서는 리포트 PDF에 들어간다 */
+function ContentPlanCard({ clientId }: { clientId: string }) {
+  const [state, setState] = useState<{ clientId: string; plan: ContentPlan | null; error: string | null } | null>(null);
 
-  async function handleSuggest() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.getContentSuggestions(clientId);
-      setSuggestions(res.suggestions);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getContentPlan(clientId)
+      .then((plan) => {
+        if (!cancelled) setState({ clientId, plan, error: null });
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setState({ clientId, plan: null, error: e.message });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
+  const loading = state?.clientId !== clientId;
+  const plan = loading ? null : state?.plan ?? null;
 
   return (
     <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
@@ -238,27 +244,45 @@ function ContentSuggestions({ clientId }: { clientId: string }) {
           <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <IconTrendingUp className="w-4 h-4" />
           </span>
-          콘텐츠 개선 제안
+          콘텐츠 처방
         </span>
-        {!suggestions && (
-          <button
-            className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50 shrink-0"
-            disabled={loading}
-            onClick={handleSuggest}
-          >
-            {loading ? "생성 중..." : "제안 받기"}
-          </button>
+        {plan?.generatedAt && (
+          <span className="text-xs text-gray-400">{new Date(plan.generatedAt).toLocaleDateString("ko-KR")} 측정 기준</span>
         )}
       </div>
-      {error && <div className="text-xs text-red-500">{error}</div>}
-      {suggestions ? (
-        <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-1">
-          {stripMarkdown(suggestions)}
-        </div>
+
+      {loading ? (
+        <div className="text-sm text-gray-400 py-4 text-center">AI 답변과 인용 출처를 분석해 처방을 만드는 중... (처음엔 30초쯤 걸립니다)</div>
+      ) : state?.error ? (
+        <div className="text-xs text-red-500">{state.error}</div>
+      ) : !plan || plan.items.length === 0 ? (
+        <div className="text-sm text-gray-400 py-4 text-center">{plan?.note ?? "아직 측정 결과가 없습니다."}</div>
       ) : (
-        <div className="text-sm text-gray-400 py-4 text-center">
-          미노출 키워드와 경쟁 현황을 바탕으로 보강하면 좋을 콘텐츠를 제안해드립니다
-        </div>
+        <>
+          <ol className="space-y-3">
+            {plan.items.map((item, i) => (
+              <li key={item.keywordId} className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-medium text-gray-800">
+                    {i + 1}. {item.question}
+                  </span>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                    월 {volumeLabel(item)} · AI 추천 {item.tally.count}/{item.tally.total}회
+                  </span>
+                </div>
+                <div className="text-sm text-blue-700 mt-1">→ {item.headline}</div>
+                {item.competitors.length > 0 && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    AI가 대신 추천: {item.competitors.map((c) => c.name).join(", ")}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+          <div className="text-xs text-gray-400 mt-3">
+            페이지 설계서(제목·첫 문단·FAQ·꼭 넣을 정보)와 AI가 근거로 읽은 페이지는 리포트 PDF에 들어갑니다.
+          </div>
+        </>
       )}
     </div>
   );
@@ -530,7 +554,7 @@ export function CompetitorAnalysis({
             )}
           </div>
 
-          <ContentSuggestions clientId={clientId} />
+          <ContentPlanCard clientId={clientId} />
         </div>
       )}
     </div>

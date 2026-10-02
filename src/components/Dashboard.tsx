@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
 import { api } from "@/lib/api";
 import type {
   Client,
@@ -27,7 +26,6 @@ import { CompetitorAnalysis } from "./CompetitorAnalysis";
 import { TrendChart } from "./TrendChart";
 import { UsageDashboard } from "./UsageDashboard";
 import { AccountManagement } from "./AccountManagement";
-import { ReportPrintView } from "./ReportPrintView";
 import { SiteAudit } from "./SiteAudit";
 
 
@@ -233,7 +231,12 @@ export function Dashboard() {
     setReportMessage(null);
     try {
       const res = await api.sendReport(selectedClientId);
-      setReportMessage({ type: "ok", text: `${res.sentTo}로 리포트를 발송했습니다.` });
+      setReportMessage({
+        type: "ok",
+        text: res.attached
+          ? `${res.sentTo}로 리포트를 PDF로 첨부해 발송했습니다.`
+          : `${res.sentTo}로 리포트를 발송했습니다 (PDF를 만들지 못해 본문에 실었습니다).`,
+      });
     } catch (e) {
       setReportMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -246,49 +249,11 @@ export function Dashboard() {
     setDownloadingPdf(true);
     setReportMessage(null);
 
-    const host = document.createElement("div");
-    host.style.position = "fixed";
-    host.style.left = "-99999px";
-    host.style.top = "0";
-    document.body.appendChild(host);
-    const root = createRoot(host);
-
     try {
-      const data = await api.getReportData(selectedClientId);
-      root.render(<ReportPrintView data={data} />);
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
-
-      const canvas = await html2canvas(host.firstElementChild as HTMLElement, { scale: 2 });
-      const imgData = canvas.toDataURL("image/jpeg", 0.85);
-
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`${selectedClient.name}_주간리포트.pdf`);
+      await api.downloadReportPdf(selectedClientId, `${selectedClient.name}_AI노출리포트.pdf`);
     } catch (e) {
       setReportMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
     } finally {
-      root.unmount();
-      document.body.removeChild(host);
       setDownloadingPdf(false);
     }
   }

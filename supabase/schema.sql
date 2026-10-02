@@ -19,6 +19,8 @@ create table if not exists clients (
   naver_blog_url text,
   -- 자동 모니터링 주기(일). 비어 있으면 기본 주기(7일)
   monitor_interval_days smallint check (monitor_interval_days is null or monitor_interval_days between 1 and 60),
+  -- 리포트에 넣을 항목 (자동 체크가 끝나면 auto_report_enabled인 병원에 PDF로 발송)
+  report_sections jsonb not null default '["exposure", "competitors", "trends", "site"]'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -131,10 +133,21 @@ create table if not exists site_audits (
   created_at timestamptz not null default now()
 );
 
+-- 실행마다 만드는 콘텐츠 처방 (질문별로 AI가 대신 추천한 곳·근거 페이지·만들 페이지 설계서)
+create table if not exists content_plans (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  run_id uuid references monitoring_runs(id) on delete set null,
+  plan jsonb not null,
+  cost_usd numeric,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_keywords_client on keywords(client_id);
 create index if not exists idx_runs_client on monitoring_runs(client_id);
 create index if not exists idx_results_run on monitoring_results(run_id);
 create index if not exists idx_results_keyword on monitoring_results(keyword_id);
 create index if not exists idx_site_audits_client on site_audits(client_id);
+create index if not exists idx_content_plans_client on content_plans(client_id, created_at desc);
 create index if not exists idx_naver_results_run on naver_results(run_id);
 create index if not exists idx_naver_results_keyword on naver_results(keyword_id);

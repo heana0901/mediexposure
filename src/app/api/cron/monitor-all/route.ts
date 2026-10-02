@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { runMonitoringForClient } from "@/lib/runMonitoringForClient";
-import { getClientReportData } from "@/lib/reportData";
-import { renderReportEmail } from "@/lib/emailTemplate";
-import { sendReportEmail } from "@/lib/email";
+import { sendClientReport } from "@/lib/reportDelivery";
+import { withPdfRenderer, type PdfRenderer } from "@/lib/pdf";
 import { clientIntervalDays, minRunGapMs } from "@/lib/schedule";
 
 export const maxDuration = 300;
@@ -12,6 +11,8 @@ export const maxDuration = 300;
 const START_BUDGET_MS = 150_000;
 /** 각 클라이언트 실행 안에서 새 AI 호출을 끊는 시점. 뒤이은 리포트 발송 시간을 남겨 둔다. */
 const CALL_BUDGET_MS = 200_000;
+/** 이 시점이 지나면 남은 리포트 발송을 미룬다 (함수 실행 한도 300초) */
+const REPORT_BUDGET_MS = 260_000;
 /** 동시에 모니터링하는 클라이언트 수 */
 const CLIENT_CONCURRENCY = 3;
 
@@ -86,6 +87,9 @@ export async function GET(request: Request) {
     }
   }
 
+  // 이번 실행에서 체크를 마친 병원 (리포트 자동 발송 대상)
+  const completed = new Set<string>();
+
   async function monitorOne(client: (typeof due)[number]) {
     if (Date.now() - startedAt > START_BUDGET_MS) {
       summary.push({
@@ -98,6 +102,7 @@ export async function GET(request: Request) {
 
     try {
       const result = await runMonitoringForClient(supabase, client, { deadline: startedAt + CALL_BUDGET_MS });
+      if (result) completed.add(client.id);
       summary.push({
         clientId: client.id,
         clientName: client.name,
@@ -122,27 +127,51 @@ export async function GET(request: Request) {
     })
   );
 
-  // KST 기준 오늘 요일(0=일 ~ 6=토)에 자동 발송이 예약된 병원에 리포트 발송
-  const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCDay();
+  // 이번에 자동 체크를 마친 병원 중 '체크 후 리포트 발송'을 켠 곳에 PDF 리포트를 보낸다
   const reportSummary: { clientId: string; clientName: string; status: string }[] = [];
+  const toSend = (clients ?? []).filter((c) => completed.has(c.id) && c.auto_report_enabled);
 
-  for (const client of clients ?? []) {
-    if (!client.auto_report_enabled || client.auto_report_day !== todayKst) continue;
-    if (!client.contact_email) {
-      reportSummary.push({ clientId: client.id, clientName: client.name, status: "건너뜀 (수신 이메일 없음)" });
-      continue;
+  async function deliver(render: PdfRenderer) {
+    for (const client of toSend) {
+      if (!client.contact_email) {
+        reportSummary.push({ clientId: client.id, clientName: client.name, status: "건너뜀 (수신 이메일 없음)" });
+        continue;
+      }
+      if (Date.now() - startedAt > REPORT_BUDGET_MS) {
+        reportSummary.push({
+          clientId: client.id,
+          clientName: client.name,
+          status: "미룸 (실행 시간 한도 · 계정 관리의 '지금 발송'으로 보내세요)",
+        });
+        continue;
+      }
+      try {
+        const result = await sendClientReport(client.id, { generatePlan: false, render });
+        reportSummary.push({
+          clientId: client.id,
+          clientName: client.name,
+          status: `발송 완료 (${result.sentTo}${result.attached ? " · PDF 첨부" : " · PDF 없이 본문으로"})`,
+        });
+      } catch (err) {
+        reportSummary.push({
+          clientId: client.id,
+          clientName: client.name,
+          status: `발송 실패: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
     }
+  }
+
+  if (toSend.length) {
     try {
-      const data = await getClientReportData(client.id);
-      const { subject, html } = renderReportEmail(data);
-      await sendReportEmail(client.contact_email, subject, html);
-      reportSummary.push({ clientId: client.id, clientName: client.name, status: `발송 완료 (${client.contact_email})` });
+      await withPdfRenderer(deliver);
     } catch (err) {
-      reportSummary.push({
-        clientId: client.id,
-        clientName: client.name,
-        status: `발송 실패: ${err instanceof Error ? err.message : String(err)}`,
-      });
+      // 크롬을 띄우지 못했으면 PDF 없이 본문에 리포트 전체를 실어 보낸다
+      if (reportSummary.length === 0) {
+        await deliver(async () => {
+          throw err;
+        });
+      }
     }
   }
 

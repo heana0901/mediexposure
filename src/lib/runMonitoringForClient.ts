@@ -10,6 +10,7 @@ import { selectActiveKeywords } from "./keywords";
 import { ensureVariants } from "./keywordVariants";
 import { judgeResponse } from "./nameMatch";
 import { recordNaver } from "./naver/record";
+import { getContentPlan } from "./contentPlan";
 import { PROVIDER_META, type Provider } from "./providers";
 
 /**
@@ -327,6 +328,16 @@ export async function runMonitoringForClient(
 
   // 같은 질문으로 네이버 쪽(검색량·플레이스·블로그·웹문서)도 함께 기록한다
   warnings.push(...(await recordNaver(supabase, run.id, keywords, client)));
+
+  // 이번 실행을 근거로 콘텐츠 처방(리포트에 들어감)을 새로 만든다.
+  // 자동 실행 시간이 빠듯하면 건너뛰고, 다음에 화면이나 리포트를 열 때 만든다.
+  if (deadline === undefined || Date.now() < deadline - 20_000) {
+    try {
+      await getContentPlan(supabase, { ...client, aliases }, { generate: true });
+    } catch (err) {
+      warnings.push(`콘텐츠 처방을 만들지 못했습니다: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   return { run, results: attempt.data, keywords, providers, samples, queryMode, warnings };
 }

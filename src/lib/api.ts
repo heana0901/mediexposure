@@ -11,13 +11,13 @@ import type {
   CompetitorFrequencyEntry,
   SourceFrequencyEntry,
   AppUser,
+  ContentPlan,
   AppUserInput,
   SiteAuditHistoryEntry,
   DemandSummary,
   KeywordIdea,
   NaverResult,
 } from "./types";
-import type { ClientReportData } from "./reportData";
 import type { SiteComparisonResult } from "./diagnose-shared";
 
 async function json<T>(res: Response): Promise<T> {
@@ -112,10 +112,8 @@ export const api = {
   analyzeResult: (id: string) =>
     fetch(`/api/results/${id}/analyze`, { method: "POST" }).then((r) => json<MonitoringResult>(r)),
 
-  getContentSuggestions: (clientId: string) =>
-    fetch(`/api/clients/${clientId}/content-suggestions`, { method: "POST" }).then((r) =>
-      json<{ suggestions: string }>(r)
-    ),
+  getContentPlan: (clientId: string) =>
+    fetch(`/api/clients/${clientId}/content-plan`).then((r) => json<ContentPlan>(r)),
 
   getTrends: (clientId: string) =>
     fetch(`/api/trends?clientId=${clientId}`).then((r) => json<TrendPoint[]>(r)),
@@ -147,17 +145,33 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
-    }).then((r) => json<{ ok: true; sentTo: string }>(r)),
+    }).then((r) => json<{ ok: true; sentTo: string; attached: boolean; pdfError: string | null }>(r)),
 
-  getReportData: (clientId: string) =>
-    fetch(`/api/reports/data?clientId=${clientId}`).then((r) => json<ClientReportData>(r)),
+  /** 메일에 첨부하는 것과 같은 리포트 PDF를 내려받는다 */
+  downloadReportPdf: async (clientId: string, fallbackName: string) => {
+    const res = await fetch(`/api/reports/pdf?clientId=${clientId}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as { error?: string }).error ?? `PDF를 만들지 못했습니다 (${res.status})`);
+    }
+    const disposition = res.headers.get("Content-Disposition") ?? "";
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/)?.[1];
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = encoded ? decodeURIComponent(encoded) : fallbackName;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
-  updateAutoReport: (clientId: string, enabled: boolean, day: number | null) =>
+  /** 체크가 끝나면 리포트 자동 발송 여부와 리포트에 넣을 항목 */
+  updateAutoReport: (clientId: string, enabled: boolean, sections: string[]) =>
     fetch(`/api/clients/${clientId}/auto-report`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled, day }),
-    }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
+      body: JSON.stringify({ enabled, sections }),
+    }).then((r) => json<{ id: string; auto_report_enabled: boolean; report_sections: string[] }>(r)),
 
   updateMonitorInterval: (clientId: string, intervalDays: number | null) =>
     fetch(`/api/clients/${clientId}/monitor-schedule`, {

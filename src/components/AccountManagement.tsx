@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { AppUser, Client } from "@/lib/types";
 import { DEFAULT_INTERVAL_DAYS, INTERVAL_OPTIONS, intervalLabel } from "@/lib/schedule";
+import { ALL_REPORT_SECTIONS, parseReportSections, REPORT_SECTIONS, type ReportSection } from "@/lib/reportSections";
 
 type Props = {
   clients: Client[];
@@ -218,36 +219,66 @@ function ClientAccessCell({
   );
 }
 
-function MonitorIntervalRow({ client, onSaved }: { client: Client; onSaved: (client: Client) => void }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+function ClientAutomationRow({ client, onSaved }: { client: Client; onSaved: (client: Client) => void }) {
+  const [busy, setBusy] = useState<"save" | "send" | null>(null);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const sections = parseReportSections(client.report_sections);
 
-  async function handleChange(value: string) {
-    const intervalDays = value === "" ? null : Number(value);
-    setSaving(true);
-    setError(null);
+  async function run(kind: "save" | "send", task: () => Promise<string>) {
+    setBusy(kind);
+    setMessage(null);
     try {
-      await api.updateMonitorInterval(client.id, intervalDays);
-      onSaved({ ...client, monitor_interval_days: intervalDays });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
+      setMessage({ type: "ok", text: await task() });
+      if (kind === "save") setTimeout(() => setMessage(null), 1500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
   }
 
+  function changeInterval(value: string) {
+    const intervalDays = value === "" ? null : Number(value);
+    void run("save", async () => {
+      await api.updateMonitorInterval(client.id, intervalDays);
+      onSaved({ ...client, monitor_interval_days: intervalDays });
+      return "저장됨";
+    });
+  }
+
+  function changeReport(enabled: boolean, next: ReportSection[]) {
+    void run("save", async () => {
+      await api.updateAutoReport(client.id, enabled, next);
+      onSaved({ ...client, auto_report_enabled: enabled, report_sections: next });
+      return "저장됨";
+    });
+  }
+
+  function toggleSection(key: ReportSection) {
+    const next = sections.includes(key) ? sections.filter((s) => s !== key) : [...sections, key];
+    if (next.length === 0) {
+      setMessage({ type: "error", text: "항목을 하나 이상 남겨 주세요" });
+      return;
+    }
+    changeReport(client.auto_report_enabled, ALL_REPORT_SECTIONS.filter((s) => next.includes(s)));
+  }
+
+  function sendNow() {
+    void run("send", async () => {
+      const res = await api.sendReport(client.id);
+      return res.attached ? `${res.sentTo}로 PDF 발송` : `${res.sentTo}로 발송 (PDF 없이 본문)`;
+    });
+  }
+
   return (
-    <tr className="border-b border-gray-100 last:border-0">
-      <td className="py-2.5 text-gray-700">{client.name}</td>
-      <td className="py-2.5">
+    <tr className="border-b border-gray-100 last:border-0 align-top">
+      <td className="py-3 pr-3 text-gray-700 whitespace-nowrap">{client.name}</td>
+      <td className="py-3 pr-3">
         <select
           className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 disabled:opacity-40"
-          disabled={saving}
+          disabled={busy !== null}
           value={client.monitor_interval_days ?? ""}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) => changeInterval(e.target.value)}
         >
           <option value="">기본 ({intervalLabel(DEFAULT_INTERVAL_DAYS)})</option>
           {INTERVAL_OPTIONS.map((days) => (
@@ -258,128 +289,60 @@ function MonitorIntervalRow({ client, onSaved }: { client: Client; onSaved: (cli
           ))}
         </select>
       </td>
-      <td className="py-2.5 text-right">
-        {saving && <span className="text-xs text-gray-400">저장 중...</span>}
-        {saved && <span className="text-xs text-green-600">저장됨</span>}
-        {error && <span className="text-xs text-red-500">{error}</span>}
+      <td className="py-3 pr-3">
+        <div className="flex flex-wrap gap-1.5">
+          {REPORT_SECTIONS.map((s) => {
+            const on = sections.includes(s.key);
+            return (
+              <button
+                key={s.key}
+                type="button"
+                title={s.detail}
+                disabled={busy !== null}
+                onClick={() => toggleSection(s.key)}
+                className={`text-xs px-2.5 py-1 rounded-full border whitespace-nowrap disabled:opacity-50 ${
+                  on ? "bg-blue-50 border-blue-300 text-blue-600" : "bg-white border-gray-200 text-gray-400"
+                }`}
+              >
+                {on ? "✓ " : ""}
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
       </td>
-    </tr>
-  );
-}
-
-function MonitorSchedule({ clients }: { clients: Client[] }) {
-  const [localClients, setLocalClients] = useState(clients);
-  const [syncedClients, setSyncedClients] = useState(clients);
-
-  if (clients !== syncedClients) {
-    setSyncedClients(clients);
-    setLocalClients(clients);
-  }
-
-  if (localClients.length === 0) return null;
-
-  return (
-    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
-      <div className="text-sm font-medium text-gray-700 mb-1">AI 노출 자동 체크 주기</div>
-      <div className="text-xs text-gray-400 mb-3">
-        매일 낮 12시에 확인해서, 마지막 체크 후 이 주기가 지난 병원만 자동으로 체크합니다. 주기가 짧을수록 추이를
-        촘촘히 볼 수 있지만 비용이 늘어납니다. &lsquo;모니터링 실행&rsquo; 버튼은 주기와 상관없이 언제든 쓸 수 있습니다.
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs text-gray-400 border-b">
-            <th className="py-2 font-normal">클라이언트명</th>
-            <th className="py-2 font-normal">자동 체크 주기</th>
-            <th className="py-2 font-normal text-right"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {localClients.map((c) => (
-            <MonitorIntervalRow
-              key={c.id}
-              client={c}
-              onSaved={(updated) =>
-                setLocalClients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-              }
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-
-function AutoReportRow({ client, onSaved }: { client: Client; onSaved: (client: Client) => void }) {
-  const [enabled, setEnabled] = useState(client.auto_report_enabled);
-  const [day, setDay] = useState<number>(client.auto_report_day ?? 1);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  const dirty = enabled !== client.auto_report_enabled || (enabled && day !== client.auto_report_day);
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      await api.updateAutoReport(client.id, enabled, enabled ? day : null);
-      onSaved({ ...client, auto_report_enabled: enabled, auto_report_day: enabled ? day : null });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <tr className="border-b border-gray-100 last:border-0">
-      <td className="py-2.5 text-gray-700">{client.name}</td>
-      <td className="py-2.5 text-xs text-gray-500">
-        {client.contact_email ?? <span className="text-gray-300">미등록</span>}
-      </td>
-      <td className="py-2.5">
-        <label className="flex items-center gap-1.5 text-xs text-gray-600">
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          자동 발송
+      <td className="py-3 pr-3">
+        <label className="flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={client.auto_report_enabled}
+            disabled={busy !== null}
+            onChange={(e) => changeReport(e.target.checked, sections)}
+          />
+          체크 후 자동 발송
         </label>
+        <div className="text-xs text-gray-400 mt-1 whitespace-nowrap">
+          {client.contact_email ?? <span className="text-amber-600">수신 이메일 미등록</span>}
+        </div>
       </td>
-      <td className="py-2.5">
-        <select
-          className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 disabled:opacity-40 disabled:bg-gray-50"
-          disabled={!enabled}
-          value={day}
-          onChange={(e) => setDay(Number(e.target.value))}
-        >
-          {DAY_LABELS.map((label, i) => (
-            <option key={i} value={i}>
-              매주 {label}요일
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className="py-2.5 text-right">
-        {enabled && !client.contact_email && (
-          <span className="text-xs text-amber-600 mr-2">수신 이메일 필요</span>
-        )}
-        {error && <span className="text-xs text-red-500 mr-2">{error}</span>}
-        {saved && <span className="text-xs text-green-600 mr-2">저장됨</span>}
+      <td className="py-3 text-right">
         <button
-          className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
-          disabled={!dirty || saving || (enabled && !client.contact_email)}
-          onClick={handleSave}
+          className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 whitespace-nowrap"
+          disabled={busy !== null || !client.contact_email}
+          title={client.contact_email ? "고른 항목으로 리포트 PDF를 지금 보냅니다" : "수신 이메일을 먼저 등록하세요"}
+          onClick={sendNow}
         >
-          {saving ? "저장 중..." : "저장"}
+          {busy === "send" ? "보내는 중..." : "📧 지금 발송"}
         </button>
+        {message && (
+          <div className={`text-xs mt-1 ${message.type === "ok" ? "text-green-600" : "text-red-500"}`}>{message.text}</div>
+        )}
       </td>
     </tr>
   );
 }
 
-function AutoReportSchedule({ clients }: { clients: Client[] }) {
+function ClientAutomation({ clients }: { clients: Client[] }) {
   const [localClients, setLocalClients] = useState(clients);
   const [syncedClients, setSyncedClients] = useState(clients);
 
@@ -392,32 +355,33 @@ function AutoReportSchedule({ clients }: { clients: Client[] }) {
 
   return (
     <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
-      <div className="text-sm font-medium text-gray-700 mb-1">주간 리포트 자동 발송 예약</div>
-      <div className="text-xs text-gray-400 mb-3">
-        선택한 요일 낮 12시 자동 체크 때, 해당 클라이언트의 수신 이메일로 가장 최근 결과의 리포트를 자동 발송합니다.
+      <div className="text-sm font-medium text-gray-700 mb-1">병원별 자동 체크 · 리포트</div>
+      <div className="text-xs text-gray-400 mb-3 leading-relaxed">
+        매일 낮 12시에 확인해서, 마지막 체크 후 주기가 지난 병원을 자동으로 체크합니다. &lsquo;체크 후 자동 발송&rsquo;을 켜면 체크가
+        끝나자마자 고른 항목만 담은 리포트를 PDF로 첨부해 수신 이메일로 보냅니다. 주기가 짧을수록 비용이 늘어납니다.
       </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs text-gray-400 border-b">
-            <th className="py-2 font-normal">클라이언트명</th>
-            <th className="py-2 font-normal">수신 이메일</th>
-            <th className="py-2 font-normal">사용 여부</th>
-            <th className="py-2 font-normal">발송 요일</th>
-            <th className="py-2 font-normal text-right">관리</th>
-          </tr>
-        </thead>
-        <tbody>
-          {localClients.map((c) => (
-            <AutoReportRow
-              key={c.id}
-              client={c}
-              onSaved={(updated) =>
-                setLocalClients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-              }
-            />
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-400 border-b">
+              <th className="py-2 pr-3 font-normal">클라이언트명</th>
+              <th className="py-2 pr-3 font-normal">자동 체크 주기</th>
+              <th className="py-2 pr-3 font-normal">리포트에 넣을 항목</th>
+              <th className="py-2 pr-3 font-normal">발송</th>
+              <th className="py-2 font-normal"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {localClients.map((c) => (
+              <ClientAutomationRow
+                key={c.id}
+                client={c}
+                onSaved={(updated) => setLocalClients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -543,9 +507,7 @@ export function AccountManagement({ clients, currentUsername }: Props) {
         )}
       </div>
 
-      <MonitorSchedule clients={clients} />
-
-      <AutoReportSchedule clients={clients} />
+      <ClientAutomation clients={clients} />
     </div>
   );
 }

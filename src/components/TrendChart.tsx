@@ -196,6 +196,12 @@ export function TrendChart({ data }: Props) {
               {PROVIDER_META[provider].label}
             </span>
           ))}
+          {data.some((d) => d.conditionChanged) && (
+            <span className="flex items-center gap-1.5" title="질문 방식·모델·반복 횟수가 바뀐 시점">
+              <span className="h-3 border-l-2 border-dashed border-amber-500" />
+              측정 방식 변경
+            </span>
+          )}
         </div>
 
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" role="img" aria-label="언급률 추이 그래프">
@@ -293,10 +299,8 @@ export function TrendChart({ data }: Props) {
                   stroke="#f59e0b"
                   strokeWidth={1.5}
                   strokeDasharray="4 3"
+                  pointerEvents="none"
                 />
-                <text x={x(i) + 4} y={PADDING.top + 10} fontSize={10} fill="#d97706">
-                  측정 방식 변경
-                </text>
               </g>
             ) : null
           )}

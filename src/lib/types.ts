@@ -22,6 +22,8 @@ export type Client = {
   naver_blog_url?: string | null;
   /** 자동 모니터링 주기(일). 없으면 기본 주기(7일) (018) */
   monitor_interval_days?: number | null;
+  /** 리포트에 넣을 항목 (019). 없으면 전부 */
+  report_sections?: string[] | null;
   created_at: string;
 };
 
@@ -165,6 +167,40 @@ export type UsageSummary = {
     remainingRuns: number;
     projectedUsd: number;
   }[];
+};
+
+/** 질문 하나에 대한 콘텐츠 처방: AI가 대신 추천한 곳과 이유, 근거로 읽은 페이지, 만들 페이지 설계서 */
+export type ContentPrescription = {
+  keywordId: string;
+  question: string;
+  /** 네이버 대표 검색어와 월간 검색량 */
+  searchKeyword: string | null;
+  volume: number | null;
+  /** 최근 실행에서 우리 병원을 추천한 횟수 */
+  tally: ExposureTally;
+  /** AI가 대신 추천한 곳과, 답변 문장에 근거한 추천 이유 */
+  competitors: { name: string; count: number; why: string }[];
+  /** AI가 이 질문에 근거로 인용한 페이지 (우리 홈페이지 제외) */
+  citedPages: { host: string; title: string | null; url: string | null; count: number }[];
+  /** 우리 홈페이지가 출처로 인용된 답변 수 */
+  ownCited: number;
+  /** 우리 병원이 밀리는 이유 한 줄 */
+  gap: string;
+  /** 화면에 보여줄 한 줄 처방 */
+  headline: string;
+  /** 만들 페이지 설계서 */
+  page: { title: string; slug: string; summary: string; faqs: string[]; mustHave: string[] };
+  /** 의료광고 규정에 걸릴 수 있어 빼거나 확인이 필요한 표현 */
+  cautions: string[];
+};
+
+export type ContentPlan = {
+  generatedAt: string;
+  /** 이 처방의 근거가 된 가장 최근 실행 */
+  runId: string | null;
+  items: ContentPrescription[];
+  /** 처방할 질문이 없을 때 등의 안내 */
+  note: string | null;
 };
 
 export type TrendPoint = {

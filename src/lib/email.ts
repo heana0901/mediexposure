@@ -16,7 +16,12 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendReportEmail(to: string, subject: string, html: string) {
+export async function sendReportEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachments: { filename: string; content: Buffer; contentType: string }[] = []
+) {
   const user = process.env.GMAIL_USER;
   if (!user || !process.env.GMAIL_APP_PASSWORD) {
     throw new Error("GMAIL_USER / GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
@@ -27,5 +32,6 @@ export async function sendReportEmail(to: string, subject: string, html: string)
     to,
     subject,
     html,
+    attachments,
   });
 }
