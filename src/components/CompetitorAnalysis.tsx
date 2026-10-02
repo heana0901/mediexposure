@@ -4,24 +4,29 @@ import { useState } from "react";
 import type {
   ClientType,
   CompetitorFrequencyEntry,
-  Provider,
+  ProviderCounts,
   SelfExposure,
   SourceFrequencyEntry,
   ResultWithKeyword,
 } from "@/lib/types";
 import { keywordTextOf } from "@/lib/types";
+import { PROVIDER_META, PROVIDERS, providerKeys, type Provider } from "@/lib/providers";
 import { api } from "@/lib/api";
 import { IconAlertTriangle, IconBuilding, IconTrendingUp, IconLink } from "./icons";
 
-
-
-const PROVIDER_LABEL: Record<Provider, string> = {
-  chatgpt: "ChatGPT",
-  gemini: "Gemini",
-};
-
-const CHATGPT_COLOR = "#2a78d6";
-const GEMINI_COLOR = "#1baf7a";
+/** AI별 횟수를 색 점과 함께 나란히 보여준다 */
+function ProviderCountDots({ counts, providers }: { counts: ProviderCounts; providers: Provider[] }) {
+  return (
+    <>
+      {providers.map((provider) => (
+        <span key={provider} className="flex items-center gap-1" title={PROVIDER_META[provider].label}>
+          <span className="w-2 h-2 rounded-full" style={{ background: PROVIDER_META[provider].color }} />
+          {counts[provider] ?? 0}
+        </span>
+      ))}
+    </>
+  );
+}
 
 type Props = {
   clientId: string;
@@ -56,11 +61,8 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
     <div className="border border-gray-100 rounded-lg p-3">
       <div className="flex items-center justify-between gap-2 mb-2 text-sm">
         <div className="flex items-center gap-2">
-          <span
-            className="font-medium"
-            style={{ color: result.provider === "chatgpt" ? CHATGPT_COLOR : GEMINI_COLOR }}
-          >
-            {PROVIDER_LABEL[result.provider]}
+          <span className="font-medium" style={{ color: PROVIDER_META[result.provider].color }}>
+            {PROVIDER_META[result.provider].label}
           </span>
           <span className="text-gray-700">{keywordTextOf(result)}</span>
         </div>
@@ -165,29 +167,24 @@ export function CompetitorAnalysis({
   const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
   const entityLabel = clientType === "hospital" ? "병원" : "업체";
 
+  // 실제로 측정한 AI만 (과거 데이터엔 ChatGPT·Gemini만 있을 수 있다)
+  const measured = providerKeys(selfExposure.byProvider);
+  const providers = measured.length ? measured : PROVIDERS.filter((p) => p === "chatgpt" || p === "gemini");
+
   type RankedEntity = { name: string; count: number; isSelf: boolean };
 
-  function rankedCandidates(provider: "chatgpt" | "gemini"): RankedEntity[] {
+  function rankedCandidates(provider: Provider): RankedEntity[] {
     const candidates: RankedEntity[] = [
-      { name: clientName, count: selfExposure[provider].count, isSelf: true },
-      ...competitorFrequency.map((c) => ({ name: c.name, count: c[provider], isSelf: false })),
+      { name: clientName, count: selfExposure.byProvider[provider]?.count ?? 0, isSelf: true },
+      ...competitorFrequency.map((c) => ({ name: c.name, count: c.counts[provider] ?? 0, isSelf: false })),
     ];
     return candidates.filter((c) => c.count > 0).sort((a, b) => b.count - a.count);
   }
 
-  function topByProvider(provider: "chatgpt" | "gemini"): RankedEntity | null {
-    return rankedCandidates(provider)[0] ?? null;
-  }
-
-  function selfRankByProvider(provider: "chatgpt" | "gemini"): number | null {
+  function selfRankByProvider(provider: Provider): number | null {
     const idx = rankedCandidates(provider).findIndex((c) => c.isSelf);
     return idx === -1 ? null : idx + 1;
   }
-
-  const topChatgpt = topByProvider("chatgpt");
-  const topGemini = topByProvider("gemini");
-  const selfChatgptRank = selfRankByProvider("chatgpt");
-  const selfGeminiRank = selfRankByProvider("gemini");
 
   return (
     <div>
@@ -221,15 +218,17 @@ export function CompetitorAnalysis({
               <span className="text-2xl font-semibold text-blue-600">{selfExposure.count}회</span>
               <span className="text-sm text-gray-400">({selfRate}%)</span>
             </div>
-            <div className="flex gap-4 text-xs text-gray-500">
-              <span>
-                ChatGPT {selfExposure.chatgpt.count}/{selfExposure.chatgpt.total}회
-                {selfChatgptRank && <span className="text-blue-600 font-semibold"> · {selfChatgptRank}위</span>}
-              </span>
-              <span>
-                Gemini {selfExposure.gemini.count}/{selfExposure.gemini.total}회
-                {selfGeminiRank && <span className="text-blue-600 font-semibold"> · {selfGeminiRank}위</span>}
-              </span>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+              {providers.map((provider) => {
+                const tally = selfExposure.byProvider[provider] ?? { count: 0, total: 0 };
+                const rank = selfRankByProvider(provider);
+                return (
+                  <span key={provider}>
+                    {PROVIDER_META[provider].label} {tally.count}/{tally.total}회
+                    {rank && <span className="text-blue-600 font-semibold"> · {rank}위</span>}
+                  </span>
+                );
+              })}
             </div>
           </div>
 
@@ -242,40 +241,26 @@ export function CompetitorAnalysis({
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: CHATGPT_COLOR }}>
-                  ChatGPT
-                </span>
-                {topChatgpt ? (
-                  <span className="text-sm truncate">
-                    {topChatgpt.isSelf ? (
-                      <span className="text-blue-600 font-bold">{topChatgpt.name}</span>
+              {providers.map((provider) => {
+                const top = rankedCandidates(provider)[0] ?? null;
+                return (
+                  <div key={provider} className="flex items-center justify-between gap-3">
+                    <span className="text-xs shrink-0" style={{ color: PROVIDER_META[provider].color }}>
+                      {PROVIDER_META[provider].label}
+                    </span>
+                    {top ? (
+                      <span className="text-sm truncate">
+                        <span className={top.isSelf ? "text-blue-600 font-bold" : "text-black font-bold"}>
+                          {top.name}
+                        </span>{" "}
+                        <span className="text-gray-400 font-normal">({top.count}회)</span>
+                      </span>
                     ) : (
-                      <span className="text-black font-bold">{topChatgpt.name}</span>
-                    )}{" "}
-                    <span className="text-gray-400 font-normal">({topChatgpt.count}회)</span>
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-300">데이터 없음</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: GEMINI_COLOR }}>
-                  Gemini
-                </span>
-                {topGemini ? (
-                  <span className="text-sm truncate">
-                    {topGemini.isSelf ? (
-                      <span className="text-blue-600 font-bold">{topGemini.name}</span>
-                    ) : (
-                      <span className="text-black font-bold">{topGemini.name}</span>
-                    )}{" "}
-                    <span className="text-gray-400 font-normal">({topGemini.count}회)</span>
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-300">데이터 없음</span>
-                )}
-              </div>
+                      <span className="text-sm text-gray-300">데이터 없음</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -301,14 +286,7 @@ export function CompetitorAnalysis({
                     </span>
                     <span className="flex-1 text-gray-700 truncate">{c.name}</span>
                     <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
-                        {c.chatgpt}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
-                        {c.gemini}
-                      </span>
+                      <ProviderCountDots counts={c.counts} providers={providers} />
                       <span className="text-gray-400">총 {c.total}회</span>
                     </span>
                   </li>
@@ -366,14 +344,7 @@ export function CompetitorAnalysis({
                     </span>
                     <span className="flex-1 text-gray-700 truncate">{s.domain}</span>
                     <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full" style={{ background: CHATGPT_COLOR }} />
-                        {s.chatgpt}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full" style={{ background: GEMINI_COLOR }} />
-                        {s.gemini}
-                      </span>
+                      <ProviderCountDots counts={s.counts} providers={providers} />
                       <span className="text-gray-400">총 {s.total}회</span>
                     </span>
                   </li>

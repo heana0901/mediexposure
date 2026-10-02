@@ -1,8 +1,6 @@
 import "server-only";
 import type { ClientReportData } from "./reportData";
-
-const CHATGPT = "#2a78d6";
-const GEMINI = "#1baf7a";
+import { PROVIDER_META } from "./providers";
 const INK = "#16202c";
 const MUTED = "#8b95a3";
 const LINE = "#e8ebef";
@@ -18,12 +16,8 @@ function pct(n: number | null) {
   return n === null ? "-" : `${n}%`;
 }
 
-const PROVIDER_LABEL: Record<string, string> = { chatgpt: "ChatGPT", gemini: "Gemini" };
-const PROVIDER_COLOR: Record<string, string> = { chatgpt: CHATGPT, gemini: GEMINI };
-const PROVIDER_BG: Record<string, string> = { chatgpt: "#eaf2fc", gemini: "#e8f8f1" };
-
 export function renderReportEmail(data: ClientReportData): { subject: string; html: string } {
-  const { client, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend } = data;
+  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend } = data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const period =
     weeklyTrend.length > 0
@@ -38,8 +32,12 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
       (t) => `
       <tr>
         <td style="padding:8px 6px;border-bottom:1px solid ${LINE};color:${MUTED};font-size:12px;">${fmtDate(t.createdAt)}</td>
-        <td style="padding:8px 6px;border-bottom:1px solid ${LINE};color:${CHATGPT};font-size:13px;text-align:right;">${pct(t.chatgptRate)}</td>
-        <td style="padding:8px 6px;border-bottom:1px solid ${LINE};color:${GEMINI};font-size:13px;text-align:right;">${pct(t.geminiRate)}</td>
+        ${providers
+          .map(
+            (p) =>
+              `<td style="padding:8px 6px;border-bottom:1px solid ${LINE};color:${PROVIDER_META[p].color};font-size:13px;text-align:right;">${pct(t.rates[p] ?? null)}</td>`
+          )
+          .join("")}
         <td style="padding:8px 6px;border-bottom:1px solid ${LINE};color:${INK};font-size:13px;text-align:right;font-weight:600;">${pct(t.overallRate)}</td>
       </tr>`
     )
@@ -50,8 +48,12 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
       (c, i) => `
       <tr>
         <td style="padding:9px 6px;border-bottom:1px solid ${LINE};font-size:13px;color:${INK};">${i + 1}. ${c.name}</td>
-        <td style="padding:9px 6px;border-bottom:1px solid ${LINE};font-size:12.5px;color:${CHATGPT};text-align:right;">${c.chatgpt}</td>
-        <td style="padding:9px 6px;border-bottom:1px solid ${LINE};font-size:12.5px;color:${GEMINI};text-align:right;">${c.gemini}</td>
+        ${providers
+          .map(
+            (p) =>
+              `<td style="padding:9px 6px;border-bottom:1px solid ${LINE};font-size:12.5px;color:${PROVIDER_META[p].color};text-align:right;">${c.counts[p] ?? 0}</td>`
+          )
+          .join("")}
         <td style="padding:9px 6px;border-bottom:1px solid ${LINE};font-size:12.5px;color:${MUTED};text-align:right;">총 ${c.total}회</td>
       </tr>`
     )
@@ -62,7 +64,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
       (u) => `
       <div style="border:1px solid ${LINE};border-left:3px solid ${WARN};background:${WARN_BG};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-size:13px;font-weight:600;margin-bottom:4px;">
-          <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;background:${PROVIDER_BG[u.provider]};color:${PROVIDER_COLOR[u.provider]};">${PROVIDER_LABEL[u.provider]}</span>
+          <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;background:${PROVIDER_META[u.provider].bg};color:${PROVIDER_META[u.provider].color};">${PROVIDER_META[u.provider].label}</span>
           <span style="margin-left:6px;color:${INK};">${u.keyword}</span>
         </div>
         <div style="font-size:12px;color:${MUTED};">
@@ -94,8 +96,12 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
           <div style="font-size:12px;color:${MUTED};margin-bottom:6px;">${client.name} 노출 빈도</div>
           <div style="font-size:26px;font-weight:700;color:${INK};">${selfExposure.count}회 <span style="font-size:13px;font-weight:400;color:${MUTED};">(${selfRate}%)</span></div>
           <div style="font-size:12px;color:${MUTED};margin-top:6px;">
-            <span style="color:${CHATGPT};">ChatGPT ${selfExposure.chatgpt.count}/${selfExposure.chatgpt.total}회</span> ·
-            <span style="color:${GEMINI};">Gemini ${selfExposure.gemini.count}/${selfExposure.gemini.total}회</span>
+            ${providers
+              .map((p) => {
+                const tally = selfExposure.byProvider[p] ?? { count: 0, total: 0 };
+                return `<span style="color:${PROVIDER_META[p].color};">${PROVIDER_META[p].label} ${tally.count}/${tally.total}회</span>`;
+              })
+              .join(" · ")}
           </div>
         </td>
         <td width="4%"></td>
@@ -115,8 +121,12 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td style="padding:0 6px 8px;font-size:11px;color:${MUTED};text-transform:uppercase;">날짜</td>
-          <td style="padding:0 6px 8px;font-size:11px;color:${MUTED};text-align:right;">ChatGPT</td>
-          <td style="padding:0 6px 8px;font-size:11px;color:${MUTED};text-align:right;">Gemini</td>
+          ${providers
+            .map(
+              (p) =>
+                `<td style="padding:0 6px 8px;font-size:11px;color:${MUTED};text-align:right;">${PROVIDER_META[p].label}</td>`
+            )
+            .join("")}
           <td style="padding:0 6px 8px;font-size:11px;color:${MUTED};text-align:right;">전체</td>
         </tr>
         ${trendRows}

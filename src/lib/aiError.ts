@@ -1,3 +1,5 @@
+import { providerLabel } from "./providers";
+
 /**
  * AI 제공자 호출 오류를 화면에 그대로 띄울 수 있는 한국어 문장으로 바꿉니다.
  *
@@ -6,10 +8,16 @@
  */
 export function describeAiError(error: unknown, provider?: string): string {
   const message = error instanceof Error ? error.message : String(error);
-  const who = provider === "gemini" ? "Gemini" : provider === "chatgpt" ? "ChatGPT" : "AI";
+  const who = provider ? providerLabel(provider) : "AI";
 
   if (/no credits remaining|insufficient_quota|credit_balance_exhausted/i.test(message)) {
     return `${who}: OpenAI API 크레딧이 소진되었습니다. platform.openai.com > Settings > Billing에서 크레딧을 충전하세요. (ChatGPT Plus 구독료는 API 크레딧과 별개입니다)`;
+  }
+  if (/credit balance is too low/i.test(message)) {
+    return `${who}: Anthropic API 크레딧이 부족합니다. platform.claude.com > Billing에서 크레딧을 충전하세요. (Claude Pro 구독료는 API 크레딧과 별개입니다)`;
+  }
+  if (provider === "perplexity" && /402|insufficient|balance|credit/i.test(message)) {
+    return `${who}: Perplexity API 크레딧이 부족합니다. perplexity.ai > Settings > API에서 크레딧을 충전하세요.`;
   }
   if (/401|invalid[_ ]api[_ ]key|Incorrect API key|API key not valid/i.test(message)) {
     return `${who}: API 키가 올바르지 않습니다. 환경변수 설정을 확인하세요.`;

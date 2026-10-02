@@ -1,3 +1,7 @@
+import type { Provider } from "./providers";
+
+export type { Provider } from "./providers";
+
 export type ClientType = "hospital" | "business";
 
 export type Client = {
@@ -33,8 +37,6 @@ export type Keyword = {
   created_at: string;
 };
 
-export type Provider = "chatgpt" | "gemini";
-
 export type Source = { title: string; url: string };
 
 export type MonitoringResult = {
@@ -57,6 +59,8 @@ export type MonitoringResult = {
   /** AI가 실제로 웹 검색을 수행했는지(마이그레이션 이전 데이터는 null) */
   searched: boolean | null;
   search_queries: string[];
+  /** 같은 질문을 같은 AI에 반복해서 물은 회차(0부터). 014 마이그레이션 이전 데이터는 null */
+  sample_index: number | null;
   created_at: string;
 };
 
@@ -77,25 +81,25 @@ export type MonitoringRun = {
   created_at: string;
 };
 
+/** AI별 횟수. 측정하지 않은 AI는 키가 없다. */
+export type ProviderCounts = Partial<Record<Provider, number>>;
+
 export type CompetitorFrequencyEntry = {
   name: string;
-  chatgpt: number;
-  gemini: number;
+  counts: ProviderCounts;
   total: number;
 };
 
 export type SourceFrequencyEntry = {
   domain: string;
-  chatgpt: number;
-  gemini: number;
+  counts: ProviderCounts;
   total: number;
 };
 
-export type SelfExposure = {
-  count: number;
-  total: number;
-  chatgpt: { count: number; total: number };
-  gemini: { count: number; total: number };
+export type ExposureTally = { count: number; total: number };
+
+export type SelfExposure = ExposureTally & {
+  byProvider: Partial<Record<Provider, ExposureTally>>;
 };
 
 export type UsageSummary = {
@@ -107,8 +111,8 @@ export type UsageSummary = {
 export type TrendPoint = {
   runId: string;
   createdAt: string;
-  chatgptRate: number | null;
-  geminiRate: number | null;
+  /** AI별 노출률(%). 그 실행에서 측정하지 않은 AI는 키가 없다. */
+  rates: Partial<Record<Provider, number>>;
   overallRate: number | null;
 };
 
@@ -125,4 +129,50 @@ export type AppUserInput = {
   password: string;
   isAdmin: boolean;
   clientIds: string[];
+};
+
+/** 사람이 실제 AI 앱에서 검색해 붙여넣은 답변 (015 마이그레이션) */
+export type ManualCheck = {
+  id: string;
+  client_id: string;
+  keyword_id: string | null;
+  keyword_text: string;
+  provider: Provider;
+  raw_response: string;
+  mentioned: boolean;
+  rank: number | null;
+  competitors: string[];
+  checked_at: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+/** 같은 질문·같은 AI에 대해 실제 화면 기록과 가장 가까운 시점의 API 측정 */
+export type ApiMeasurement = {
+  runId: string;
+  runAt: string;
+  samples: number;
+  hits: number;
+  /** 노출 확률(%) */
+  rate: number;
+  avgRank: number | null;
+};
+
+export type ManualCheckWithComparison = ManualCheck & {
+  api: ApiMeasurement | null;
+  /** API가 '노출'(확률 50% 이상)로 본 것과 실제 화면이 같은지. 비교할 측정이 없으면 null */
+  agrees: boolean | null;
+};
+
+export type ManualCheckSummary = {
+  comparable: number;
+  matches: number;
+  byProvider: Partial<Record<Provider, { comparable: number; matches: number }>>;
+};
+
+export type ManualChecksResponse = {
+  checks: ManualCheckWithComparison[];
+  summary: ManualCheckSummary;
+  /** 015 마이그레이션 전이라 표가 없으면 true */
+  setupRequired?: boolean;
 };

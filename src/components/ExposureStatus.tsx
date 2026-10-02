@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ClientType, MonitoringRun, Provider, ResultWithKeyword } from "@/lib/types";
+import type { ClientType, MonitoringRun, ResultWithKeyword } from "@/lib/types";
 import { keywordTextOf } from "@/lib/types";
+import { PROVIDER_META, providersIn, type Provider } from "@/lib/providers";
 import { IconEye, IconLink } from "./icons";
-
-
 
 type Props = {
   clientName: string;
@@ -14,11 +13,6 @@ type Props = {
   runs: MonitoringRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
-};
-
-const PROVIDER_LABEL: Record<Provider, string> = {
-  chatgpt: "ChatGPT",
-  gemini: "Gemini",
 };
 
 function groupByKeyword(results: ResultWithKeyword[]) {
@@ -33,7 +27,20 @@ function groupByKeyword(results: ResultWithKeyword[]) {
   return Array.from(map.entries());
 }
 
-function highlight(text: string, clientName: string) {
+/** 한 AI에 같은 질문을 여러 번 물은 답변들을 회차 순으로 */
+function samplesOf(results: ResultWithKeyword[], provider: Provider) {
+  return results
+    .filter((r) => r.provider === provider)
+    .sort((a, b) => (a.sample_index ?? 0) - (b.sample_index ?? 0));
+}
+
+function averageRank(samples: ResultWithKeyword[]): number | null {
+  const ranks = samples.filter((r) => r.mentioned && r.rank).map((r) => r.rank as number);
+  if (ranks.length === 0) return null;
+  return Math.round((ranks.reduce((a, b) => a + b, 0) / ranks.length) * 10) / 10;
+}
+
+export function highlight(text: string, clientName: string) {
   if (!clientName) return text;
   const parts = text.split(clientName);
   return parts.flatMap((part, i) =>
@@ -45,6 +52,49 @@ function highlight(text: string, clientName: string) {
           </mark>,
           part,
         ]
+  );
+}
+
+function ProviderTile({
+  provider,
+  samples,
+  active,
+  onClick,
+}: {
+  provider: Provider;
+  samples: ResultWithKeyword[];
+  active: boolean;
+  onClick: () => void;
+}) {
+  const meta = PROVIDER_META[provider];
+  const hits = samples.filter((r) => r.mentioned).length;
+  const rate = Math.round((hits / samples.length) * 100);
+  const avgRank = averageRank(samples);
+  const skippedSearch = samples.filter((r) => r.searched === false).length;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col justify-start text-left border rounded-lg p-3 transition ${
+        active ? "border-blue-400 bg-blue-50" : "border-gray-100 hover:border-gray-200"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 text-sm text-gray-600">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: meta.color }} />
+        {meta.label}
+      </div>
+      <div className={`text-xl font-semibold ${hits > 0 ? "text-gray-900" : "text-gray-400"}`}>{rate}%</div>
+      <div className="text-xs mt-1">
+        {hits > 0 ? (
+          <span className="text-blue-600">
+            {samples.length}회 중 {hits}회 노출{avgRank ? ` · 평균 ${avgRank}위` : ""}
+          </span>
+        ) : (
+          <span className="text-red-400">{samples.length}회 모두 미노출</span>
+        )}
+      </div>
+      {skippedSearch > 0 && <div className="text-[11px] text-amber-600 mt-1">웹검색 미실행 {skippedSearch}회</div>}
+    </button>
   );
 }
 
@@ -60,55 +110,63 @@ function KeywordCard({
   results: ResultWithKeyword[];
 }) {
   const competitorLabel = clientType === "hospital" ? "경쟁 병원" : "경쟁 업체";
+  const providers = providersIn(results);
   const mentionedCount = results.filter((r) => r.mentioned).length;
   const overallRate = Math.round((mentionedCount / results.length) * 100);
 
   const [activeProvider, setActiveProvider] = useState<Provider>(
-    results.find((r) => r.mentioned)?.provider ?? results[0].provider
+    providers.find((p) => results.some((r) => r.provider === p && r.mentioned)) ?? providers[0]
   );
+  const [activeSample, setActiveSample] = useState(0);
 
-  const active = results.find((r) => r.provider === activeProvider) ?? results[0];
+  const samples = samplesOf(results, activeProvider);
+  const active = samples[Math.min(activeSample, samples.length - 1)] ?? results[0];
+
+  function selectProvider(provider: Provider) {
+    setActiveProvider(provider);
+    // 노출된 회차가 있으면 그 답변부터 보여준다
+    const index = samplesOf(results, provider).findIndex((r) => r.mentioned);
+    setActiveSample(index === -1 ? 0 : index);
+  }
 
   return (
     <div className="border border-gray-100 rounded-xl bg-white overflow-hidden shadow-sm">
-      <div className="p-4 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
+      <div className="p-4 border-b border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium text-sm text-gray-800">{keywordText}</span>
         <span className="text-xs text-gray-500">
-          전체 언급률 <b className="text-gray-800">{overallRate}%</b> ({mentionedCount}/
-          {results.length}건)
+          전체 노출 확률 <b className="text-gray-800">{overallRate}%</b> ({mentionedCount}/{results.length}회)
         </span>
       </div>
 
-      <div className="grid gap-3 p-4" style={{ gridTemplateColumns: `repeat(${results.length}, 1fr)` }}>
-        {results.map((r) => (
-          <button
-            key={r.provider}
-            onClick={() => setActiveProvider(r.provider)}
-            className={`text-left border rounded-lg p-3 transition ${
-              activeProvider === r.provider
-                ? "border-blue-400 bg-blue-50"
-                : "border-gray-100 hover:border-gray-200"
-            }`}
-          >
-            <div className="text-sm text-gray-600">{PROVIDER_LABEL[r.provider]}</div>
-            <div className="text-xl font-semibold">{r.mentioned ? "100%" : "0%"}</div>
-            <div className="text-xs mt-1">
-              {r.mentioned ? (
-                <span className="text-blue-600">{r.rank ? `${r.rank}순위 1회` : "언급 1회"}</span>
-              ) : (
-                <span className="text-red-400">미노출 1회</span>
-              )}
-            </div>
-            {r.searched === false && (
-              <div className="text-[11px] text-amber-600 mt-1">웹검색 미실행</div>
-            )}
-          </button>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
+        {providers.map((provider) => (
+          <ProviderTile
+            key={provider}
+            provider={provider}
+            samples={samplesOf(results, provider)}
+            active={active.provider === provider}
+            onClick={() => selectProvider(provider)}
+          />
         ))}
       </div>
 
       <div className="px-4 pb-4">
-        <div className="text-xs text-gray-500 mb-2">
-          {PROVIDER_LABEL[active.provider]} 응답 결과
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="text-xs text-gray-500">{PROVIDER_META[active.provider].label} 응답</span>
+          {samples.length > 1 &&
+            samples.map((r, i) => (
+              <button
+                key={r.id}
+                onClick={() => setActiveSample(i)}
+                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                  r.id === active.id
+                    ? "border-blue-400 bg-blue-50 text-blue-700"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}
+              >
+                {i + 1}회차 · {r.mentioned ? (r.rank ? `${r.rank}위` : "노출") : "미노출"}
+              </button>
+            ))}
         </div>
         <div className="border border-gray-100 rounded-lg p-3 max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap bg-gray-50/60">
           {active.raw_response ? highlight(active.raw_response, clientName) : "응답 없음"}
@@ -117,10 +175,7 @@ function KeywordCard({
           <div className="flex flex-wrap gap-2 mt-3">
             <span className="text-xs text-gray-500 mr-1">{competitorLabel}:</span>
             {active.competitors.map((c) => (
-              <span
-                key={c}
-                className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-1"
-              >
+              <span key={c} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-1">
                 {c}
               </span>
             ))}

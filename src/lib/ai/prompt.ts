@@ -7,7 +7,30 @@ const SUBJECT: Record<ClientType, string> = {
 };
 
 /**
- * AI에게 "검색 결과를 재현하라"고 지시하는 공통 지침.
+ * 질문을 AI에 보내는 방식.
+ *
+ * - natural(기본): 환자가 앱 검색창에 치는 문장을 그대로 보낸다. 답변 형식은 지시하지 않고,
+ *   실제 앱이 대화 맥락에 넣어 주는 정도의 대략적인 위치만 알려 준다.
+ *   실제 화면과 가장 비슷하지만 답변 형식이 매번 달라서, 같은 질문을 여러 번 물어 확률로 본다.
+ * - list: "추천 병원을 1~10위로 나열하라"고 형식을 못박는 예전 방식. 순위 비교는 쉽지만
+ *   실제 사용자가 받는 답과는 형태가 다르다.
+ *
+ * MONITOR_QUERY_MODE=list 로 예전 방식으로 되돌릴 수 있다.
+ */
+export type QueryMode = "natural" | "list";
+
+export function getQueryMode(): QueryMode {
+  return process.env.MONITOR_QUERY_MODE?.trim().toLowerCase() === "list" ? "list" : "natural";
+}
+
+/** 자연 질문 모드의 시스템 맥락. 위치를 모르면 아무것도 덧붙이지 않는다. */
+export function buildNaturalContext(location?: LocationHint | null): string | undefined {
+  const where = [location?.region, location?.city].filter(Boolean).join(" ");
+  return where ? `사용자의 대략적인 위치: 대한민국 ${where}` : undefined;
+}
+
+/**
+ * (list 모드) AI에게 "검색 결과를 재현하라"고 지시하는 공통 지침.
  * 키워드만 그대로 던지면 ChatGPT는 웹 검색 없이 질환/서비스 설명문을 내놓기 때문에,
  * 실제 상호명이 순위대로 나열되도록 답변 형식을 못박아 둔다.
  */

@@ -64,7 +64,7 @@ function describeAiError(error: unknown): string {
   return `AI 진단 코멘트를 만들지 못했습니다: ${message}`;
 }
 
-const SINGLE_SITE_PROMPT = `너는 웹사이트가 ChatGPT, Gemini 같은 생성형 AI 검색엔진에 얼마나 잘 노출·인용될 수 있는지 진단하는 GEO(Generative Engine Optimization) 전문가다.
+const SINGLE_SITE_PROMPT = `너는 웹사이트가 ChatGPT, Gemini, Perplexity, Claude 같은 생성형 AI 검색엔진에 얼마나 잘 노출·인용될 수 있는지 진단하는 GEO(Generative Engine Optimization) 전문가다.
 
 입력으로 25개 항목 체크리스트 결과와 4개 축(SEO 기술 최적화 40%, AEO AI 인용 준비도 20%, GEO 엔티티 인식 20%, 네이버 대응 20%) 점수, 100점 만점 총점이 주어진다.
 
@@ -74,7 +74,7 @@ const SINGLE_SITE_PROMPT = `너는 웹사이트가 ChatGPT, Gemini 같은 생성
 3. 문제마다 바로 적용 가능한 개선 방법을 제시하라. 가능하면 실제로 붙여넣을 수 있는 예시(개선된 meta description 문안, JSON-LD 스키마 종류 등)를 직접 써 줘라.
 4. "콘텐츠를 보강하세요" 같은 추상적 조언은 쓰지 마라.`;
 
-const COMPARISON_PROMPT = `너는 여러 웹사이트가 ChatGPT, Gemini 같은 생성형 AI 검색엔진에 얼마나 잘 노출·인용될 수 있는지 비교 진단하는 GEO(Generative Engine Optimization) 전문가다. 첫 번째 사이트가 분석 대상(우리 사이트)이고 나머지는 경쟁사다.
+const COMPARISON_PROMPT = `너는 여러 웹사이트가 ChatGPT, Gemini, Perplexity, Claude 같은 생성형 AI 검색엔진에 얼마나 잘 노출·인용될 수 있는지 비교 진단하는 GEO(Generative Engine Optimization) 전문가다. 첫 번째 사이트가 분석 대상(우리 사이트)이고 나머지는 경쟁사다.
 
 입력으로 각 사이트의 25개 항목 체크리스트 결과와 4개 축 점수, 100점 만점 총점이 주어진다.
 

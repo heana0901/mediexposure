@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { assertClientAccess } from "@/lib/dal";
+import { rate, ratesByProvider } from "@/lib/aggregate";
+import { fetchClientResults } from "@/lib/clientResults";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,33 +26,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: runsError.message }, { status: 500 });
   }
 
-  const runIds = (runs ?? []).map((r) => r.id);
-  if (runIds.length === 0) {
+  if ((runs ?? []).length === 0) {
     return NextResponse.json([]);
   }
 
-  const { data: results, error: resultsError } = await supabase
-    .from("monitoring_results")
-    .select("run_id, provider, mentioned")
-    .in("run_id", runIds);
+  let results: { run_id: string; provider: string; mentioned: boolean }[];
+  try {
+    results = await fetchClientResults(supabase, clientId, "id, run_id, provider, mentioned, created_at");
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  }
 
-  if (resultsError) {
-    return NextResponse.json({ error: resultsError.message }, { status: 500 });
+  const resultsByRun = new Map<string, typeof results>();
+  for (const r of results) {
+    const list = resultsByRun.get(r.run_id) ?? [];
+    list.push(r);
+    resultsByRun.set(r.run_id, list);
   }
 
   const trends = (runs ?? []).map((run) => {
-    const runResults = (results ?? []).filter((r) => r.run_id === run.id);
-    const chatgptResults = runResults.filter((r) => r.provider === "chatgpt");
-    const geminiResults = runResults.filter((r) => r.provider === "gemini");
-
-    const rate = (list: typeof runResults) =>
-      list.length === 0 ? null : Math.round((list.filter((r) => r.mentioned).length / list.length) * 100);
-
+    const runResults = resultsByRun.get(run.id) ?? [];
     return {
       runId: run.id,
       createdAt: run.created_at,
-      chatgptRate: rate(chatgptResults),
-      geminiRate: rate(geminiResults),
+      rates: ratesByProvider(runResults),
       overallRate: rate(runResults),
     };
   });

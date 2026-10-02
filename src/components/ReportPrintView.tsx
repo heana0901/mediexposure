@@ -1,7 +1,5 @@
 import type { ClientReportData } from "@/lib/reportData";
-
-const CHATGPT_COLOR = "#2a78d6";
-const GEMINI_COLOR = "#1baf7a";
+import { PROVIDER_META } from "@/lib/providers";
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -17,7 +15,7 @@ type Props = {
 };
 
 export function ReportPrintView({ data }: Props) {
-  const { client, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend } = data;
+  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend } = data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const period =
     weeklyTrend.length > 0
@@ -56,13 +54,17 @@ export function ReportPrintView({ data }: Props) {
             <span style={{ fontSize: 13, fontWeight: 400, color: "#8b95a3" }}>({selfRate}%)</span>
           </div>
           <div style={{ fontSize: 12, color: "#8b95a3", marginTop: 6 }}>
-            <span style={{ color: CHATGPT_COLOR }}>
-              ChatGPT {selfExposure.chatgpt.count}/{selfExposure.chatgpt.total}회
-            </span>{" "}
-            ·{" "}
-            <span style={{ color: GEMINI_COLOR }}>
-              Gemini {selfExposure.gemini.count}/{selfExposure.gemini.total}회
-            </span>
+            {providers.map((provider, i) => {
+              const tally = selfExposure.byProvider[provider] ?? { count: 0, total: 0 };
+              return (
+                <span key={provider}>
+                  {i > 0 && " · "}
+                  <span style={{ color: PROVIDER_META[provider].color }}>
+                    {PROVIDER_META[provider].label} {tally.count}/{tally.total}회
+                  </span>
+                </span>
+              );
+            })}
           </div>
         </div>
         <div style={{ flex: 1, border: "1px solid #e8ebef", borderRadius: 10, padding: 16 }}>
@@ -83,12 +85,14 @@ export function ReportPrintView({ data }: Props) {
             <thead>
               <tr>
                 <td style={{ padding: "0 6px 8px", fontSize: 11, color: "#8b95a3" }}>날짜</td>
-                <td style={{ padding: "0 6px 8px", fontSize: 11, color: "#8b95a3", textAlign: "right" }}>
-                  ChatGPT
-                </td>
-                <td style={{ padding: "0 6px 8px", fontSize: 11, color: "#8b95a3", textAlign: "right" }}>
-                  Gemini
-                </td>
+                {providers.map((provider) => (
+                  <td
+                    key={provider}
+                    style={{ padding: "0 6px 8px", fontSize: 11, color: "#8b95a3", textAlign: "right" }}
+                  >
+                    {PROVIDER_META[provider].label}
+                  </td>
+                ))}
                 <td style={{ padding: "0 6px 8px", fontSize: 11, color: "#8b95a3", textAlign: "right" }}>
                   전체
                 </td>
@@ -100,26 +104,19 @@ export function ReportPrintView({ data }: Props) {
                   <td style={{ padding: "8px 6px", borderBottom: "1px solid #e8ebef", color: "#8b95a3" }}>
                     {fmtDate(t.createdAt)}
                   </td>
-                  <td
-                    style={{
-                      padding: "8px 6px",
-                      borderBottom: "1px solid #e8ebef",
-                      color: CHATGPT_COLOR,
-                      textAlign: "right",
-                    }}
-                  >
-                    {pct(t.chatgptRate)}
-                  </td>
-                  <td
-                    style={{
-                      padding: "8px 6px",
-                      borderBottom: "1px solid #e8ebef",
-                      color: GEMINI_COLOR,
-                      textAlign: "right",
-                    }}
-                  >
-                    {pct(t.geminiRate)}
-                  </td>
+                  {providers.map((provider) => (
+                    <td
+                      key={provider}
+                      style={{
+                        padding: "8px 6px",
+                        borderBottom: "1px solid #e8ebef",
+                        color: PROVIDER_META[provider].color,
+                        textAlign: "right",
+                      }}
+                    >
+                      {pct(t.rates[provider] ?? null)}
+                    </td>
+                  ))}
                   <td
                     style={{
                       padding: "8px 6px",
@@ -150,28 +147,20 @@ export function ReportPrintView({ data }: Props) {
                   <td style={{ padding: "9px 6px", borderBottom: "1px solid #e8ebef", color: "#16202c" }}>
                     {i + 1}. {c.name}
                   </td>
-                  <td
-                    style={{
-                      padding: "9px 6px",
-                      borderBottom: "1px solid #e8ebef",
-                      color: CHATGPT_COLOR,
-                      textAlign: "right",
-                      fontSize: 12.5,
-                    }}
-                  >
-                    {c.chatgpt}
-                  </td>
-                  <td
-                    style={{
-                      padding: "9px 6px",
-                      borderBottom: "1px solid #e8ebef",
-                      color: GEMINI_COLOR,
-                      textAlign: "right",
-                      fontSize: 12.5,
-                    }}
-                  >
-                    {c.gemini}
-                  </td>
+                  {providers.map((provider) => (
+                    <td
+                      key={provider}
+                      style={{
+                        padding: "9px 6px",
+                        borderBottom: "1px solid #e8ebef",
+                        color: PROVIDER_META[provider].color,
+                        textAlign: "right",
+                        fontSize: 12.5,
+                      }}
+                    >
+                      {c.counts[provider] ?? 0}
+                    </td>
+                  ))}
                   <td
                     style={{
                       padding: "9px 6px",
@@ -214,11 +203,11 @@ export function ReportPrintView({ data }: Props) {
                       fontWeight: 700,
                       padding: "2px 7px",
                       borderRadius: 5,
-                      background: u.provider === "chatgpt" ? "#eaf2fc" : "#e8f8f1",
-                      color: u.provider === "chatgpt" ? CHATGPT_COLOR : GEMINI_COLOR,
+                      background: PROVIDER_META[u.provider].bg,
+                      color: PROVIDER_META[u.provider].color,
                     }}
                   >
-                    {u.provider === "chatgpt" ? "ChatGPT" : "Gemini"}
+                    {PROVIDER_META[u.provider].label}
                   </span>
                   <span style={{ marginLeft: 6, color: "#16202c" }}>{u.keyword}</span>
                 </div>

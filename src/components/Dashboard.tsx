@@ -26,6 +26,7 @@ import { UsageDashboard } from "./UsageDashboard";
 import { AccountManagement } from "./AccountManagement";
 import { ReportPrintView } from "./ReportPrintView";
 import { SiteAudit } from "./SiteAudit";
+import { RealScreenCheck } from "./RealScreenCheck";
 
 
 
@@ -33,6 +34,7 @@ const TAB_TITLE: Record<Tab, { title: string; subtitle: string }> = {
   status: { title: "AI 노출현황", subtitle: "클라이언트별 AI 검색 노출도를 모니터링합니다" },
   competitors: { title: "경쟁분석", subtitle: "미노출 항목과 경쟁사 언급 빈도를 분석합니다" },
   trends: { title: "추이 분석", subtitle: "모니터링 실행 기록에 따른 언급률 변화를 확인합니다" },
+  realcheck: { title: "실제 화면 비교", subtitle: "실제 AI 앱에서 검색한 답변을 기록해 API 측정과 맞는지 확인합니다" },
   siteaudit: { title: "홈페이지 분석", subtitle: "홈페이지가 AI 검색엔진에 얼마나 잘 노출될 수 있는지 진단합니다" },
   usage: { title: "비용 현황", subtitle: "API 호출 횟수와 예상 비용을 확인합니다" },
   accounts: { title: "계정 관리", subtitle: "로그인 계정과 클라이언트 접근 권한을 관리합니다" },
@@ -66,7 +68,7 @@ export function Dashboard() {
     competitorFrequency: [],
     sourceFrequency: [],
     totalResults: 0,
-    selfExposure: { count: 0, total: 0, chatgpt: { count: 0, total: 0 }, gemini: { count: 0, total: 0 } },
+    selfExposure: { count: 0, total: 0, byProvider: {} },
   });
 
   const [trends, setTrends] = useState<TrendPoint[]>([]);
@@ -405,6 +407,16 @@ export function Dashboard() {
               )}
 
               {tab === "trends" && <TrendChart data={trends} />}
+
+              {tab === "realcheck" && (
+                <RealScreenCheck
+                  key={selectedClientId}
+                  clientId={selectedClientId}
+                  clientName={selectedClient?.name ?? ""}
+                  clientType={selectedClient?.client_type ?? "hospital"}
+                  keywords={keywords}
+                />
+              )}
             </>
           )}
         </div>

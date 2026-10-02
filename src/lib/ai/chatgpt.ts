@@ -1,28 +1,17 @@
 import OpenAI from "openai";
 import type { LocationHint } from "../location";
+import type { AiCallResult, AskOptions, Source } from "./types";
 import { SEARCH_RETRY_NUDGE } from "./prompt";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export type { AiCallResult, AskOptions, Source } from "./types";
 
-export type Source = { title: string; url: string };
+let client: OpenAI | null = null;
 
-export type AiCallResult = {
-  text: string;
-  model: string;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  sources: Source[];
-  /** 이번 호출에서 실제로 웹 검색이 실행됐는지 */
-  searched: boolean;
-  /** 모델이 실행한 검색어 */
-  searchQueries: string[];
-};
-
-export type AskOptions = {
-  /** 답변 형식을 못박는 시스템 지침 */
-  instructions?: string;
-  location?: LocationHint | null;
-};
+/** 키가 없는 환경에서도 이 파일을 import만 하는 건 문제없도록 처음 호출할 때 만든다. */
+function getClient(): OpenAI {
+  client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return client;
+}
 
 /** 웹 검색을 건너뛰었을 때 재시도하는 최대 횟수(첫 호출 포함) */
 const MAX_ATTEMPTS = 2;
@@ -76,10 +65,10 @@ async function createResponse(
   };
 
   try {
-    return await client.responses.create({ ...params, tool_choice: FORCE_WEB_SEARCH });
+    return await getClient().responses.create({ ...params, tool_choice: FORCE_WEB_SEARCH });
   } catch (err) {
     if (!isToolChoiceUnsupported(err)) throw err;
-    return await client.responses.create(params);
+    return await getClient().responses.create(params);
   }
 }
 
@@ -115,14 +104,15 @@ function extractSearchQueries(response: OpenAI.Responses.Response): string[] {
   return Array.from(queries);
 }
 
-function hasWebSearchCall(response: OpenAI.Responses.Response): boolean {
-  return (response.output ?? []).some((item) => item.type === "web_search_call");
+function countWebSearchCalls(response: OpenAI.Responses.Response): number {
+  return (response.output ?? []).filter((item) => item.type === "web_search_call").length;
 }
 
 export async function askChatGPT(question: string, options: AskOptions = {}): Promise<AiCallResult> {
-  const model = process.env.OPENAI_MODEL || "gpt-4o";
+  const model = process.env.OPENAI_MODEL || "gpt-5.4-mini";
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
+  let searchCount = 0;
   let last: AiCallResult = {
     text: "",
     model,
@@ -131,6 +121,7 @@ export async function askChatGPT(question: string, options: AskOptions = {}): Pr
     sources: [],
     searched: false,
     searchQueries: [],
+    searchCount: 0,
   };
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -144,14 +135,18 @@ export async function askChatGPT(question: string, options: AskOptions = {}): Pr
       outputTokens = (outputTokens ?? 0) + response.usage.output_tokens;
     }
 
+    const searches = countWebSearchCalls(response);
+    searchCount += searches;
+
     const result: AiCallResult = {
       text: response.output_text ?? "",
       model,
       inputTokens,
       outputTokens,
       sources: extractSources(response),
-      searched: hasWebSearchCall(response),
+      searched: searches > 0,
       searchQueries: extractSearchQueries(response),
+      searchCount,
     };
 
     if (result.searched) return result;

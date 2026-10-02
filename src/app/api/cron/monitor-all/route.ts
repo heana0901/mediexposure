@@ -5,7 +5,14 @@ import { getClientReportData } from "@/lib/reportData";
 import { renderReportEmail } from "@/lib/emailTemplate";
 import { sendReportEmail } from "@/lib/email";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
+
+/** 새 클라이언트 모니터링을 시작하지 않는 시점. 이후엔 남은 클라이언트를 다음 날로 미룬다. */
+const START_BUDGET_MS = 150_000;
+/** 각 클라이언트 실행 안에서 새 AI 호출을 끊는 시점. 뒤이은 리포트 발송 시간을 남겨 둔다. */
+const CALL_BUDGET_MS = 200_000;
+/** 동시에 모니터링하는 클라이언트 수 */
+const CLIENT_CONCURRENCY = 3;
 
 /**
  * 자동 모니터링 주기(일). 기본 2일에 한 번.
@@ -45,6 +52,7 @@ async function lastRunAtByClient(
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -64,7 +72,13 @@ export async function GET(request: Request) {
   const now = Date.now();
   const lastRunAt = await lastRunAtByClient(supabase, (clients ?? []).map((c) => c.id));
 
-  for (const client of clients ?? []) {
+  // 오래 안 돌린 클라이언트부터 처리한다. 시간이 모자라 밀린 클라이언트가 다음 날 먼저 돌게 하기 위해서다.
+  const ordered = [...(clients ?? [])].sort(
+    (a, b) => (lastRunAt.get(a.id) ?? 0) - (lastRunAt.get(b.id) ?? 0)
+  );
+
+  const due: typeof ordered = [];
+  for (const client of ordered) {
     const previous = lastRunAt.get(client.id);
     if (previous !== undefined && now - previous < MIN_GAP_MS) {
       const hours = Math.round((now - previous) / 3_600_000);
@@ -73,11 +87,23 @@ export async function GET(request: Request) {
         clientName: client.name,
         status: `건너뜀 (${hours}시간 전 실행 · ${INTERVAL_DAYS}일 주기)`,
       });
-      continue;
+    } else {
+      due.push(client);
+    }
+  }
+
+  async function monitorOne(client: (typeof due)[number]) {
+    if (Date.now() - startedAt > START_BUDGET_MS) {
+      summary.push({
+        clientId: client.id,
+        clientName: client.name,
+        status: "미룸 (실행 시간 한도 · 다음 자동 실행 때 먼저 처리)",
+      });
+      return;
     }
 
     try {
-      const result = await runMonitoringForClient(supabase, client);
+      const result = await runMonitoringForClient(supabase, client, { deadline: startedAt + CALL_BUDGET_MS });
       summary.push({
         clientId: client.id,
         clientName: client.name,
@@ -93,6 +119,14 @@ export async function GET(request: Request) {
       });
     }
   }
+
+  // 클라이언트 여러 곳을 동시에 돌려 한 번의 cron 안에 끝낸다
+  const queue = [...due];
+  await Promise.all(
+    Array.from({ length: Math.min(CLIENT_CONCURRENCY, queue.length) }, async () => {
+      for (let client = queue.shift(); client; client = queue.shift()) await monitorOne(client);
+    })
+  );
 
   // KST 기준 오늘 요일(0=일 ~ 6=토)에 자동 발송이 예약된 병원에 리포트 발송
   const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCDay();

@@ -72,7 +72,7 @@ ${unexposedKeywords.map((k) => `- ${k}`).join("\n")}
 같은 질문들에서 대신 자주 언급된 경쟁 ${subject}:
 ${topCompetitors.length > 0 ? topCompetitors.join(", ") : "없음"}
 
-위 정보를 바탕으로, 이 ${subject}이 AI 검색(ChatGPT, Gemini)에 더 잘 노출되기 위해 홈페이지나 블로그에 보강하면 좋을 구체적인 콘텐츠/FAQ 주제를 4~6개, 한국어로 간결하게 목록으로 제안해줘. 각 항목은 "왜 필요한지"도 한 줄로 같이 설명해줘.`;
+위 정보를 바탕으로, 이 ${subject}이 AI 검색(ChatGPT, Gemini, Perplexity, Claude)에 더 잘 노출되기 위해 홈페이지나 블로그에 보강하면 좋을 구체적인 콘텐츠/FAQ 주제를 4~6개, 한국어로 간결하게 목록으로 제안해줘. 각 항목은 "왜 필요한지"도 한 줄로 같이 설명해줘.`;
 
   try {
     const completion = await openai.chat.completions.create({

@@ -11,6 +11,9 @@ import type {
   SourceFrequencyEntry,
   AppUser,
   AppUserInput,
+  ManualCheck,
+  ManualChecksResponse,
+  Provider,
 } from "./types";
 import type { ClientReportData } from "./reportData";
 import type { SiteComparisonResult } from "./diagnose-shared";
@@ -150,6 +153,22 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled, day }),
     }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
+
+  listManualChecks: (clientId: string) =>
+    fetch(`/api/clients/${clientId}/manual-checks`).then((r) => json<ManualChecksResponse>(r)),
+
+  addManualCheck: (
+    clientId: string,
+    input: { keywordId: string; provider: Provider; rawResponse: string; checkedAt: string }
+  ) =>
+    fetch(`/api/clients/${clientId}/manual-checks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }).then((r) => json<ManualCheck>(r)),
+
+  deleteManualCheck: (id: string) =>
+    fetch(`/api/manual-checks/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
 
   runSiteAudit: (urls: string[], clientId?: string) =>
     fetch("/api/site-audit", {

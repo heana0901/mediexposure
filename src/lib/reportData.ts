@@ -1,7 +1,10 @@
 import "server-only";
 import { getSupabaseServerClient } from "./supabase";
 import { getRecentRunIds, dedupeUnexposed } from "./recentUnexposed";
-import type { CompetitorFrequencyEntry, SelfExposure } from "./types";
+import { competitorFrequency, EMPTY_SELF_EXPOSURE, rate, ratesByProvider, selfExposure as tallySelf } from "./aggregate";
+import { fetchAllPages, fetchClientResults } from "./clientResults";
+import { isProvider, providersIn, type Provider } from "./providers";
+import type { CompetitorFrequencyEntry, ResultWithKeyword, SelfExposure } from "./types";
 import { keywordTextOf } from "./types";
 
 export type ClientReportData = {
@@ -14,11 +17,13 @@ export type ClientReportData = {
     director_name: string | null;
     contact_email: string | null;
   };
+  /** 리포트 표에 열로 그릴 AI (실제로 측정한 AI만) */
+  providers: Provider[];
   selfExposure: SelfExposure;
   competitorTop5: CompetitorFrequencyEntry[];
-  unexposedRecent: { provider: "chatgpt" | "gemini"; keyword: string; competitors: string[] }[];
+  unexposedRecent: { provider: Provider; keyword: string; competitors: string[] }[];
   unexposedCount: number;
-  weeklyTrend: { createdAt: string; chatgptRate: number | null; geminiRate: number | null; overallRate: number | null }[];
+  weeklyTrend: { createdAt: string; rates: Partial<Record<Provider, number>>; overallRate: number | null }[];
 };
 
 export async function getClientReportData(clientId: string): Promise<ClientReportData> {
@@ -31,56 +36,38 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
     .single();
   if (clientError || !client) throw new Error(clientError?.message ?? "클라이언트를 찾을 수 없습니다.");
 
-  const emptySelf: SelfExposure = {
-    count: 0,
-    total: 0,
-    chatgpt: { count: 0, total: 0 },
-    gemini: { count: 0, total: 0 },
-  };
+  const allResults = await fetchClientResults(supabase, clientId);
 
-  const { data: keywords } = await supabase.from("keywords").select("id").eq("client_id", clientId);
-  const keywordIds = (keywords ?? []).map((k) => k.id);
-
-  if (keywordIds.length === 0) {
-    return { client, selfExposure: emptySelf, competitorTop5: [], unexposedRecent: [], unexposedCount: 0, weeklyTrend: [] };
+  if (allResults.length === 0) {
+    return {
+      client,
+      providers: [],
+      selfExposure: EMPTY_SELF_EXPOSURE,
+      competitorTop5: [],
+      unexposedRecent: [],
+      unexposedCount: 0,
+      weeklyTrend: [],
+    };
   }
-
-  const { data: results } = await supabase
-    .from("monitoring_results")
-    .select("*, keywords(text)")
-    .in("keyword_id", keywordIds);
-  const allResults = results ?? [];
 
   const recentRunIds = await getRecentRunIds(supabase, clientId, 3);
-  const unexposedAll = dedupeUnexposed(allResults, recentRunIds);
-
-  const frequency = new Map<string, { chatgpt: number; gemini: number }>();
-  for (const r of allResults) {
-    for (const name of (r.competitors as string[] | null) ?? []) {
-      const entry = frequency.get(name) ?? { chatgpt: 0, gemini: 0 };
-      if (r.provider === "chatgpt") entry.chatgpt += 1;
-      else entry.gemini += 1;
-      frequency.set(name, entry);
-    }
-  }
-  const competitorTop5 = Array.from(frequency.entries())
-    .map(([name, counts]) => ({ name, chatgpt: counts.chatgpt, gemini: counts.gemini, total: counts.chatgpt + counts.gemini }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
-
-  const chatgptResults = allResults.filter((r) => r.provider === "chatgpt");
-  const geminiResults = allResults.filter((r) => r.provider === "gemini");
-  const selfExposure: SelfExposure = {
-    count: allResults.filter((r) => r.mentioned).length,
-    total: allResults.length,
-    chatgpt: { count: chatgptResults.filter((r) => r.mentioned).length, total: chatgptResults.length },
-    gemini: { count: geminiResults.filter((r) => r.mentioned).length, total: geminiResults.length },
-  };
+  const recentResults = recentRunIds.size
+    ? await fetchAllPages<ResultWithKeyword>((from, to) =>
+        supabase
+          .from("monitoring_results")
+          .select("*, keywords(text)")
+          .in("run_id", [...recentRunIds])
+          .not("keyword_id", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
+    : [];
+  const unexposedAll = dedupeUnexposed(recentResults, recentRunIds).filter((r) => isProvider(r.provider));
 
   const unexposedRecent = unexposedAll.slice(0, 8).map((r) => ({
-    provider: r.provider as "chatgpt" | "gemini",
-    keyword: keywordTextOf(r as unknown as { keywords?: { text: string } | null; keyword_text?: string | null }),
-    competitors: (r.competitors as string[] | null) ?? [],
+    provider: r.provider,
+    keyword: keywordTextOf(r),
+    competitors: r.competitors ?? [],
   }));
 
   const { data: runs } = await supabase
@@ -88,19 +75,11 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
     .select("id, created_at")
     .eq("client_id", clientId)
     .order("created_at", { ascending: true });
-  const runIds = (runs ?? []).map((r) => r.id);
-
-  const { data: runResults } = runIds.length
-    ? await supabase.from("monitoring_results").select("run_id, provider, mentioned").in("run_id", runIds)
-    : { data: [] as { run_id: string; provider: string; mentioned: boolean }[] };
-
-  const rate = (list: { mentioned: boolean }[]) =>
-    list.length === 0 ? null : Math.round((list.filter((r) => r.mentioned).length / list.length) * 100);
 
   // 같은 날짜에 여러 번 실행됐으면 그날의 결과를 모두 합쳐서 하나로 집계한다
   const runDateById = new Map((runs ?? []).map((r) => [r.id, r.created_at.slice(0, 10)]));
-  const resultsByDate = new Map<string, { provider: string; mentioned: boolean }[]>();
-  for (const result of runResults ?? []) {
+  const resultsByDate = new Map<string, typeof allResults>();
+  for (const result of allResults) {
     const dateKey = runDateById.get(result.run_id);
     if (!dateKey) continue;
     const list = resultsByDate.get(dateKey) ?? [];
@@ -111,13 +90,16 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
 
   const weeklyTrend = sortedDates.slice(-7).map((dateKey) => {
     const forDate = resultsByDate.get(dateKey) ?? [];
-    return {
-      createdAt: dateKey,
-      chatgptRate: rate(forDate.filter((r) => r.provider === "chatgpt")),
-      geminiRate: rate(forDate.filter((r) => r.provider === "gemini")),
-      overallRate: rate(forDate),
-    };
+    return { createdAt: dateKey, rates: ratesByProvider(forDate), overallRate: rate(forDate) };
   });
 
-  return { client, selfExposure, competitorTop5, unexposedRecent, unexposedCount: unexposedAll.length, weeklyTrend };
+  return {
+    client,
+    providers: providersIn(allResults),
+    selfExposure: tallySelf(allResults),
+    competitorTop5: competitorFrequency(allResults).slice(0, 5),
+    unexposedRecent,
+    unexposedCount: unexposedAll.length,
+    weeklyTrend,
+  };
 }
