@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { AppUser, Client } from "@/lib/types";
+import { DEFAULT_INTERVAL_DAYS, INTERVAL_OPTIONS, intervalLabel } from "@/lib/schedule";
 
 type Props = {
   clients: Client[];
@@ -217,6 +218,97 @@ function ClientAccessCell({
   );
 }
 
+function MonitorIntervalRow({ client, onSaved }: { client: Client; onSaved: (client: Client) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function handleChange(value: string) {
+    const intervalDays = value === "" ? null : Number(value);
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateMonitorInterval(client.id, intervalDays);
+      onSaved({ ...client, monitor_interval_days: intervalDays });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className="border-b border-gray-100 last:border-0">
+      <td className="py-2.5 text-gray-700">{client.name}</td>
+      <td className="py-2.5">
+        <select
+          className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 disabled:opacity-40"
+          disabled={saving}
+          value={client.monitor_interval_days ?? ""}
+          onChange={(e) => handleChange(e.target.value)}
+        >
+          <option value="">기본 ({intervalLabel(DEFAULT_INTERVAL_DAYS)})</option>
+          {INTERVAL_OPTIONS.map((days) => (
+            <option key={days} value={days}>
+              {intervalLabel(days)}
+              {days % 7 === 0 ? ` (${days}일)` : ""}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="py-2.5 text-right">
+        {saving && <span className="text-xs text-gray-400">저장 중...</span>}
+        {saved && <span className="text-xs text-green-600">저장됨</span>}
+        {error && <span className="text-xs text-red-500">{error}</span>}
+      </td>
+    </tr>
+  );
+}
+
+function MonitorSchedule({ clients }: { clients: Client[] }) {
+  const [localClients, setLocalClients] = useState(clients);
+  const [syncedClients, setSyncedClients] = useState(clients);
+
+  if (clients !== syncedClients) {
+    setSyncedClients(clients);
+    setLocalClients(clients);
+  }
+
+  if (localClients.length === 0) return null;
+
+  return (
+    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
+      <div className="text-sm font-medium text-gray-700 mb-1">AI 노출 자동 체크 주기</div>
+      <div className="text-xs text-gray-400 mb-3">
+        매일 낮 12시에 확인해서, 마지막 체크 후 이 주기가 지난 병원만 자동으로 체크합니다. 주기가 짧을수록 추이를
+        촘촘히 볼 수 있지만 비용이 늘어납니다. &lsquo;모니터링 실행&rsquo; 버튼은 주기와 상관없이 언제든 쓸 수 있습니다.
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-gray-400 border-b">
+            <th className="py-2 font-normal">클라이언트명</th>
+            <th className="py-2 font-normal">자동 체크 주기</th>
+            <th className="py-2 font-normal text-right"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {localClients.map((c) => (
+            <MonitorIntervalRow
+              key={c.id}
+              client={c}
+              onSaved={(updated) =>
+                setLocalClients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+              }
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function AutoReportRow({ client, onSaved }: { client: Client; onSaved: (client: Client) => void }) {
@@ -302,7 +394,7 @@ function AutoReportSchedule({ clients }: { clients: Client[] }) {
     <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
       <div className="text-sm font-medium text-gray-700 mb-1">주간 리포트 자동 발송 예약</div>
       <div className="text-xs text-gray-400 mb-3">
-        매일 정기 모니터링(낮 12시) 후, 선택한 요일에 해당 클라이언트의 수신 이메일로 리포트를 자동 발송합니다.
+        선택한 요일 낮 12시 자동 체크 때, 해당 클라이언트의 수신 이메일로 가장 최근 결과의 리포트를 자동 발송합니다.
       </div>
       <table className="w-full text-sm">
         <thead>
@@ -450,6 +542,8 @@ export function AccountManagement({ clients, currentUsername }: Props) {
           </table>
         )}
       </div>
+
+      <MonitorSchedule clients={clients} />
 
       <AutoReportSchedule clients={clients} />
     </div>

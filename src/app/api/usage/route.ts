@@ -5,6 +5,7 @@ import { fetchAllPages } from "@/lib/clientResults";
 import { selectActiveKeywords } from "@/lib/keywords";
 import { getActiveProviders, getSampleCount } from "@/lib/ai/registry";
 import { isProvider, type Provider } from "@/lib/providers";
+import { clientIntervalDays, getIntervalDays, minRunGapMs } from "@/lib/schedule";
 import type { UsageSummary } from "@/lib/types";
 
 /**
@@ -53,7 +54,7 @@ function nextCron(at: number): number {
 /** 마지막 실행 시각으로부터, 다음 달이 되기 전까지 자동 실행이 몇 번 더 돌지 */
 function remainingCronRuns(lastRunAt: number | null, now: number, monthEnd: number, intervalDays: number): number {
   // cron은 매일 깨우고, 마지막 실행 후 (주기 × 24 - 12)시간이 지난 클라이언트만 돌린다
-  const minGap = Math.max(intervalDays * 24 - 12, 1) * 60 * 60 * 1000;
+  const minGap = minRunGapMs(intervalDays);
   let next = nextCron(lastRunAt === null ? now : Math.max(now, lastRunAt + minGap));
   let count = 0;
   while (next < monthEnd) {
@@ -72,9 +73,10 @@ export async function GET() {
   const supabase = getSupabaseServerClient();
   const allowedIds = await getAllowedClientIds(session);
 
-  let clientList: { id: string; name: string }[] = [];
+  let clientList: { id: string; name: string; monitor_interval_days?: number | null }[] = [];
   if (allowedIds === null || allowedIds.length > 0) {
-    let clientsQuery = supabase.from("clients").select("id, name").order("created_at", { ascending: true });
+    // "*": 018 이전 DB(monitor_interval_days 없음)에서도 깨지지 않게
+    let clientsQuery = supabase.from("clients").select("*").order("created_at", { ascending: true });
     if (allowedIds !== null) clientsQuery = clientsQuery.in("id", allowedIds);
     const { data: clients, error: clientsError } = await clientsQuery;
     if (clientsError) return NextResponse.json({ error: clientsError.message }, { status: 500 });
@@ -146,8 +148,6 @@ export async function GET() {
   const lastRunAt = new Map<string, number>();
   for (const r of lastRuns ?? []) if (!lastRunAt.has(r.client_id)) lastRunAt.set(r.client_id, Date.parse(r.created_at));
 
-  const intervalDays = Number(process.env.MONITOR_INTERVAL_DAYS ?? 2) || 2;
-
   const byClient: UsageSummary["byClient"] = await Promise.all(
     clientList.map(async (c) => {
       const mine = rows.filter((r) => r.monitoring_runs.client_id === c.id);
@@ -156,12 +156,14 @@ export async function GET() {
       const { data: keywords } = await selectActiveKeywords(supabase, c.id, "id");
       const keywordCount = keywords?.length ?? 0;
       const perRunUsd = keywordCount * perQuestionUsd;
+      const intervalDays = clientIntervalDays(c);
       const remainingRuns = keywordCount ? remainingCronRuns(lastRunAt.get(c.id) ?? null, now, nextStart, intervalDays) : 0;
       const thisMonthUsd = current.reduce((s, r) => s + (r.estimated_cost_usd ?? 0), 0);
       return {
         clientId: c.id,
         clientName: c.name,
         keywords: keywordCount,
+        intervalDays,
         perRunUsd: round(perRunUsd),
         lastMonthRuns: new Set(last.map((r) => r.run_id)).size,
         lastMonthUsd: round(last.reduce((s, r) => s + (r.estimated_cost_usd ?? 0), 0)),
@@ -177,10 +179,9 @@ export async function GET() {
   const summary: UsageSummary = {
     krwPerUsd: KRW_PER_USD,
     assumptions: {
-      intervalDays,
+      defaultIntervalDays: getIntervalDays(),
       providers,
       baseSamples,
-      scheduledRunsPerMonth: Math.round(30 / intervalDays),
     },
     costPerCall,
     lastMonth: { label: monthLabel(year, month - 1), runs: sum((c) => c.lastMonthRuns), costUsd: sum((c) => c.lastMonthUsd) },

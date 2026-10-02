@@ -159,6 +159,13 @@ export const api = {
       body: JSON.stringify({ enabled, day }),
     }).then((r) => json<{ id: string; auto_report_enabled: boolean; auto_report_day: number | null }>(r)),
 
+  updateMonitorInterval: (clientId: string, intervalDays: number | null) =>
+    fetch(`/api/clients/${clientId}/monitor-schedule`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intervalDays }),
+    }).then((r) => json<{ id: string; monitor_interval_days: number | null }>(r)),
+
   runSiteAudit: (urls: string[], clientId?: string) =>
     fetch("/api/site-audit", {
       method: "POST",

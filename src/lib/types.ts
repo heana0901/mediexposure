@@ -20,6 +20,8 @@ export type Client = {
   aliases?: string[];
   /** 병원 네이버 블로그 주소 (017) */
   naver_blog_url?: string | null;
+  /** 자동 모니터링 주기(일). 없으면 기본 주기(5일) (018) */
+  monitor_interval_days?: number | null;
   created_at: string;
 };
 
@@ -139,10 +141,10 @@ export type UsageSummary = {
   krwPerUsd: number;
   /** 이번 달 예상 비용의 계산 근거 */
   assumptions: {
-    intervalDays: number;
+    /** 병원별 주기를 정하지 않은 병원에 쓰는 기본 자동 실행 주기(일) */
+    defaultIntervalDays: number;
     providers: Provider[];
     baseSamples: number;
-    scheduledRunsPerMonth: number;
   };
   /** AI별 질문 1회당 비용과 질문당 평균 반복 횟수. measured=false면 실측이 없어 추정값 */
   costPerCall: Partial<Record<Provider, { usd: number; samples: number; measured: boolean }>>;
@@ -152,6 +154,8 @@ export type UsageSummary = {
     clientId: string;
     clientName: string;
     keywords: number;
+    /** 이 병원의 자동 실행 주기(일) */
+    intervalDays: number;
     /** 지금 설정으로 한 번 실행할 때 예상 비용 */
     perRunUsd: number;
     lastMonthRuns: number;

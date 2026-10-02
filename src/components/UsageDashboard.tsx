@@ -2,6 +2,7 @@
 
 import type { UsageSummary } from "@/lib/types";
 import { PROVIDER_META, providerKeys } from "@/lib/providers";
+import { intervalLabel } from "@/lib/schedule";
 
 type Props = {
   usage: UsageSummary | null;
@@ -54,7 +55,7 @@ export function UsageDashboard({ usage }: Props) {
         <div className="font-medium text-gray-700 mb-1">예상 비용 계산 기준</div>
         <div>
           AI {assumptions.providers.length}곳({providerNames || "없음"}) · 질문마다 기본 {assumptions.baseSamples}회(결과가 갈리면 최대
-          5회) · {assumptions.intervalDays}일마다 자동 실행(한 달 약 {assumptions.scheduledRunsPerMonth}회)
+          5회) · 병원별 주기마다 자동 실행(따로 정하지 않은 병원은 {assumptions.defaultIntervalDays}일마다, 계정 관리에서 변경)
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
           {providerKeys(costPerCall).map((p) => {
@@ -81,6 +82,7 @@ export function UsageDashboard({ usage }: Props) {
                 <tr className="text-left text-xs text-gray-400 border-b">
                   <th className="py-2 font-normal">병원</th>
                   <th className="py-2 font-normal text-right whitespace-nowrap">질문</th>
+                  <th className="py-2 font-normal text-right whitespace-nowrap">자동 실행</th>
                   <th className="py-2 font-normal text-right whitespace-nowrap">1회 실행</th>
                   <th className="py-2 font-normal text-right whitespace-nowrap">지난달</th>
                   <th className="py-2 font-normal text-right whitespace-nowrap">이번 달 현재</th>
@@ -92,6 +94,7 @@ export function UsageDashboard({ usage }: Props) {
                   <tr key={c.clientId} className="border-b border-gray-100 last:border-0">
                     <td className="py-2 text-gray-700">{c.clientName}</td>
                     <td className="py-2 text-right text-gray-600">{c.keywords}개</td>
+                    <td className="py-2 text-right text-gray-600 whitespace-nowrap">{intervalLabel(c.intervalDays)}</td>
                     <td className="py-2 text-right text-gray-600">{usd(c.perRunUsd)}</td>
                     <td className="py-2 text-right text-gray-600 whitespace-nowrap">
                       {usd(c.lastMonthUsd)} <span className="text-gray-400 text-xs">({c.lastMonthRuns}회)</span>

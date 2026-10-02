@@ -17,6 +17,8 @@ create table if not exists clients (
   aliases jsonb not null default '[]'::jsonb,
   -- 네이버 블로그 주소 (블로그 검색 결과에서 우리 글을 찾는 데 쓴다)
   naver_blog_url text,
+  -- 자동 모니터링 주기(일). 비어 있으면 기본 주기(5일)
+  monitor_interval_days smallint check (monitor_interval_days is null or monitor_interval_days between 1 and 60),
   created_at timestamptz not null default now()
 );
 
