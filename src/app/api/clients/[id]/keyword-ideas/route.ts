@@ -67,10 +67,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const rivals = competitorFrequency(results, { name: client.name }).slice(0, 30);
   const monitored = new Set((keywords ?? []).map((k) => toAdKeyword((k as { search_keyword?: string | null }).search_keyword ?? k.text)));
 
+  // 키워드 도구는 광고 업종 기준으로 느슨하게 연관된 키워드(예: '안산 허리' → '소아정형외과')까지 돌려준다.
+  // 그래서 입력한 단어가 실제로 들어간 검색어만 남기고, 단어를 많이 포함할수록 위로 올린다.
+  // 입력이 없으면 지역명이 들어간 검색어만 남긴다.
+  const seedTokens = seedParam
+    ? [...new Set(seeds.flatMap((s) => s.split(/[\s,]+/)).map((t) => t.trim()).filter((t) => t.length >= 2))]
+    : regions;
+  const matchCount = (keyword: string) => seedTokens.filter((t) => keyword.includes(t)).length;
+  const regionHit = (keyword: string) => regions.some((r) => keyword.includes(r));
+
   const ideas: KeywordIdea[] = stats
     .filter((s) => !monitored.has(s.keyword))
-    // 지역 병원이므로 지역명이 들어간 검색어를 우선 보여준다(지역이 없으면 전부)
-    .filter((s) => regions.length === 0 || seedParam || regions.some((r) => s.keyword.includes(r)))
+    .filter((s) => seedTokens.length === 0 || matchCount(s.keyword) > 0)
+    .sort(
+      (a, b) =>
+        matchCount(b.keyword) - matchCount(a.keyword) ||
+        Number(regionHit(b.keyword)) - Number(regionHit(a.keyword)) ||
+        b.total - a.total
+    )
     .map((s) => {
       const key = nameKey(s.keyword);
       const rival = rivals.find((c) => {
@@ -86,7 +100,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         competitorBrand: rival ? rival.name : null,
       };
     })
-    .sort((a, b) => b.volume - a.volume)
     .slice(0, MAX_IDEAS);
 
   return NextResponse.json({ seeds, ideas });
