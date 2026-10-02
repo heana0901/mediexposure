@@ -6,7 +6,7 @@ import { keywordTextOf } from "@/lib/types";
 import { PROVIDER_META, providersIn, type Provider } from "@/lib/providers";
 import { clientNameVariants } from "@/lib/nameMatch";
 import { marginOfError } from "@/lib/stats";
-import { stripMarkdown } from "@/lib/text";
+import { parseAnswer } from "@/lib/text";
 import { IconEye, IconLink } from "./icons";
 
 type Props = {
@@ -43,6 +43,30 @@ function averageRank(samples: ResultWithKeyword[]): number | null {
   const ranks = samples.filter((r) => r.mentioned && r.rank).map((r) => r.rank as number);
   if (ranks.length === 0) return null;
   return Math.round((ranks.reduce((a, b) => a + b, 0) / ranks.length) * 10) / 10;
+}
+
+/** AI 답변: 마크다운 기호는 지우고, 출처·주소는 새 탭으로 열리는 링크로, 우리 병원 이름은 노란색으로 */
+function AnswerText({ raw, names }: { raw: string; names: string[] }) {
+  return (
+    <>
+      {parseAnswer(raw).map((segment, i) =>
+        segment.type === "link" ? (
+          <a
+            key={i}
+            href={segment.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline decoration-blue-200 underline-offset-2 hover:decoration-blue-600"
+            title={segment.url}
+          >
+            {segment.text}
+          </a>
+        ) : (
+          <span key={i}>{highlight(segment.value, names)}</span>
+        )
+      )}
+    </>
+  );
 }
 
 /** 우리 병원 이름(별칭·띄어쓰기 차이 포함)을 노란색으로 표시한다 */
@@ -261,7 +285,7 @@ function KeywordCard({
           </div>
         )}
         <div className="border border-gray-100 rounded-lg p-3 max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap bg-gray-50/60">
-          {active.raw_response ? highlight(stripMarkdown(active.raw_response), nameVariants) : "응답 없음"}
+          {active.raw_response ? <AnswerText raw={active.raw_response} names={nameVariants} /> : "응답 없음"}
         </div>
         {active.competitors.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">

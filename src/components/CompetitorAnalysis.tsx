@@ -512,7 +512,14 @@ export function CompetitorAnalysis({
                     <span className="w-6 h-6 flex items-center justify-center rounded-full bg-sky-600 text-white text-xs shrink-0">
                       {i + 1}
                     </span>
-                    <span className="flex-1 text-gray-700 truncate">{s.domain}</span>
+                    <a
+                      href={`https://${s.domain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-gray-700 truncate hover:text-blue-600 hover:underline"
+                    >
+                      {s.domain}
+                    </a>
                     <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
                       <ProviderCountDots counts={s.counts} providers={providers} />
                       <span className="text-gray-400">총 {s.total}회</span>

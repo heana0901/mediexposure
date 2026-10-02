@@ -415,7 +415,15 @@ export function SiteAudit({
                     <AxisBars site={primary} />
                   </div>
                   <div className="text-[11px] text-gray-400 mt-4 pt-3 border-t border-gray-50">
-                    {primary.finalUrl} · 응답 {(primary.responseMs / 1000).toFixed(1)}초 · 25개 항목 중{" "}
+                    <a
+                      href={primary.finalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-blue-600 hover:underline"
+                    >
+                      {primary.finalUrl}
+                    </a>{" "}
+                    · 응답 {(primary.responseMs / 1000).toFixed(1)}초 · 25개 항목 중{" "}
                     {primary.checks.filter((c) => c.status === "pass").length}개 통과
                   </div>
                 </div>
@@ -476,7 +484,15 @@ export function SiteAudit({
                           <td className="py-2.5 pr-3 text-gray-700">
                             <span className="inline-flex items-center gap-1.5 max-w-[220px]">
                               {i === 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
-                              <span className="truncate">{s.title || s.url}</span>
+                              <a
+                                href={s.finalUrl || s.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="truncate hover:text-blue-600 hover:underline"
+                                title={s.finalUrl || s.url}
+                              >
+                                {s.title || s.url}
+                              </a>
                             </span>
                           </td>
                           <td className="py-2.5 px-2 text-right font-medium tabular-nums">
