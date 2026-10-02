@@ -15,6 +15,8 @@ create table if not exists clients (
   auto_report_day smallint,
   -- AI가 부를 수 있는 다른 이름(약칭·영문명·지점명). '노출' 판정 때 함께 찾는다
   aliases jsonb not null default '[]'::jsonb,
+  -- 네이버 블로그 주소 (블로그 검색 결과에서 우리 글을 찾는 데 쓴다)
+  naver_blog_url text,
   created_at timestamptz not null default now()
 );
 
@@ -27,7 +29,12 @@ create table if not exists keywords (
   deleted_at timestamptz,
   -- 같은 의도의 다른 표현 (반복 측정 때 회차마다 돌려 가며 묻는다)과 지명 경고
   variants jsonb not null default '[]'::jsonb,
-  variant_note text
+  variant_note text,
+  -- 네이버 대표 검색어와 월간 검색량(PC+모바일, 검색광고 API)
+  search_keyword text,
+  search_volume int,
+  search_volume_note text,
+  search_volume_checked_at timestamptz
 );
 
 create index if not exists idx_keywords_client_active
@@ -71,6 +78,25 @@ create table if not exists monitoring_results (
   created_at timestamptz not null default now()
 );
 
+-- 실행마다 같은 질문으로 본 네이버 노출 (플레이스·블로그·웹문서 순위)
+create table if not exists naver_results (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references monitoring_runs(id) on delete cascade,
+  keyword_id uuid references keywords(id) on delete set null,
+  search_keyword text not null,
+  local_rank int,
+  local_total int not null default 0,
+  blog_rank int,
+  blog_own_count int not null default 0,
+  blog_mention_count int not null default 0,
+  blog_total int not null default 0,
+  web_rank int,
+  web_total int not null default 0,
+  top_local jsonb not null default '[]'::jsonb,
+  top_blogs jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 -- 건강보험심사평가원 병원정보 조회 결과 캐시 (경쟁 병원 실존 확인)
 create table if not exists hospital_registry (
   name_key text primary key,
@@ -108,3 +134,5 @@ create index if not exists idx_runs_client on monitoring_runs(client_id);
 create index if not exists idx_results_run on monitoring_results(run_id);
 create index if not exists idx_results_keyword on monitoring_results(keyword_id);
 create index if not exists idx_site_audits_client on site_audits(client_id);
+create index if not exists idx_naver_results_run on naver_results(run_id);
+create index if not exists idx_naver_results_keyword on naver_results(keyword_id);
