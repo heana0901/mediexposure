@@ -1,5 +1,5 @@
 import { isProvider, type Provider } from "./providers";
-import { citesDomain, clientNameVariants, nameKey } from "./nameMatch";
+import { citesDomain, clientNameVariants, nameKey, sourceHost } from "./nameMatch";
 import type {
   CompetitorFrequencyEntry,
   ExposureTally,
@@ -21,11 +21,8 @@ type ResultRow = {
   mentioned: boolean;
   rank?: number | null;
   competitors?: string[] | null;
-  sources?: { url: string }[] | null;
+  sources?: { url: string; title?: string | null }[] | null;
 };
-
-// Gemini grounding이 실제 출처 대신 반환하는 리다이렉트 도메인은 집계에서 제외
-const IGNORED_SOURCE_DOMAINS = ["vertexaisearch.cloud.google.com"];
 
 function bump(counts: ProviderCounts, provider: Provider) {
   counts[provider] = (counts[provider] ?? 0) + 1;
@@ -109,10 +106,10 @@ export function visibilityMetrics(rows: ResultRow[], websiteUrl?: string | null)
     all += competitorCount + (r.mentioned ? 1 : 0);
     if (r.mentioned) ours += 1;
     if (r.mentioned && r.rank === 1) first += 1;
-    const urls = (r.sources ?? []).map((s) => s.url);
-    if (urls.length > 0) {
+    const sources = r.sources ?? [];
+    if (sources.length > 0) {
       withSources += 1;
-      if (citesDomain(urls, websiteUrl)) cited += 1;
+      if (citesDomain(sources, websiteUrl)) cited += 1;
     }
   }
 
@@ -127,17 +124,13 @@ export function sourceFrequency(rows: ResultRow[], limit = 10): SourceFrequencyE
   const frequency = new Map<string, ProviderCounts>();
   for (const r of rows) {
     if (!isProvider(r.provider)) continue;
-    // 한 답변이 같은 도메인을 여러 번 인용해도 1회로 센다
+    // 한 답변이 같은 도메인을 여러 번 인용해도 1회로 센다. Gemini 출처는 제목에서 도메인을 읽는다.
     const domains = new Set<string>();
     for (const source of r.sources ?? []) {
-      try {
-        domains.add(new URL(source.url).hostname.replace(/^www\./, ""));
-      } catch {
-        // URL이 아닌 값은 건너뛴다
-      }
+      const host = sourceHost(source);
+      if (host) domains.add(host);
     }
     for (const domain of domains) {
-      if (IGNORED_SOURCE_DOMAINS.includes(domain)) continue;
       const counts = frequency.get(domain) ?? {};
       bump(counts, r.provider);
       frequency.set(domain, counts);

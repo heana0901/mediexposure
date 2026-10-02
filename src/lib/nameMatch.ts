@@ -140,8 +140,30 @@ export function judgeResponse(
   };
 }
 
-/** 출처 URL 목록에 우리 홈페이지 도메인이 있는지 */
-export function citesDomain(urls: string[], websiteUrl: string | null | undefined): boolean {
+/** Gemini가 실제 주소 대신 돌려주는 구글 리다이렉트 주소. 이때는 제목에 도메인이 들어 있다 */
+const GOOGLE_REDIRECT_HOST = "vertexaisearch.cloud.google.com";
+
+/**
+ * 출처의 도메인. Gemini 출처는 리다이렉트 주소라 제목(예: "jyphospital.com")에서 도메인을 읽는다.
+ * 도메인을 알 수 없으면 null.
+ */
+export function sourceHost(source: { url: string; title?: string | null }): string | null {
+  let host: string;
+  try {
+    host = new URL(source.url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+  if (host !== GOOGLE_REDIRECT_HOST) return host;
+  const title = (source.title ?? "").trim().toLowerCase().replace(/^www\./, "");
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(title) ? title : null;
+}
+
+/** 출처 목록에 우리 홈페이지 도메인이 있는지 */
+export function citesDomain(
+  sources: { url: string; title?: string | null }[],
+  websiteUrl: string | null | undefined
+): boolean {
   const domain = (websiteUrl ?? "")
     .trim()
     .replace(/^https?:\/\//i, "")
@@ -149,12 +171,8 @@ export function citesDomain(urls: string[], websiteUrl: string | null | undefine
     .split(/[/?#]/)[0]
     .toLowerCase();
   if (!domain) return false;
-  return urls.some((url) => {
-    try {
-      const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
-      return host === domain || host.endsWith(`.${domain}`);
-    } catch {
-      return false;
-    }
+  return sources.some((source) => {
+    const host = sourceHost(source);
+    return host !== null && (host === domain || host.endsWith(`.${domain}`));
   });
 }
