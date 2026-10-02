@@ -38,6 +38,7 @@ export async function recordNaver(
         const query = k.search_keyword || k.text;
         try {
           const e = await checkNaverExposure(query, { ...client, aliases });
+          for (const reason of e.errors) reasons.add(reason);
           return {
             run_id: runId,
             keyword_id: k.id,
@@ -63,7 +64,11 @@ export async function recordNaver(
     )
   ).filter((r): r is NonNullable<typeof r> => r !== null);
 
-  if (failed) warnings.push(`네이버 검색 API 호출 ${failed}건 실패: ${[...reasons].join(" / ")}`);
+  if (reasons.size) {
+    warnings.push(
+      `네이버 검색 일부를 조회하지 못했습니다${failed ? `(질문 ${failed}개 전체 실패)` : ""}: ${[...reasons].join(" / ")}`
+    );
+  }
   if (rows.length) {
     const { error } = await supabase.from("naver_results").insert(rows);
     if (error) warnings.push(`네이버 노출 기록을 저장하지 못했습니다(017 마이그레이션 확인): ${error.message}`);

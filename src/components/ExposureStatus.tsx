@@ -107,6 +107,7 @@ function ProviderTile({
 }
 
 function rankLabel(rank: number | null, total: number) {
+  if (total < 0) return "조회 안 됨";
   if (total === 0) return "결과 없음";
   return rank ? `${rank}위` : `상위 ${total}개 중 없음`;
 }
@@ -115,7 +116,9 @@ function rankLabel(rank: number | null, total: number) {
 function NaverLine({ naver }: { naver: NaverResult }) {
   const [open, setOpen] = useState(false);
   const blog =
-    naver.blog_total === 0
+    naver.blog_total < 0
+      ? "조회 안 됨"
+      : naver.blog_total === 0
       ? "결과 없음"
       : naver.blog_rank
         ? `우리 블로그 ${naver.blog_rank}위`

@@ -31,7 +31,14 @@ export async function GET() {
   } else {
     try {
       const e = await checkNaverExposure("허리디스크 병원", { name: "점검용" });
-      result.search = { ok: true, detail: `플레이스 ${e.localTotal}곳 · 블로그 ${e.blogTotal}건 · 웹문서 ${e.webTotal}건 조회됨` };
+      const part = (label: string, total: number) => (total < 0 ? `${label} 조회 안 됨` : `${label} ${total}건`);
+      result.search = {
+        ok: e.errors.length === 0,
+        detail: [
+          [part("플레이스", e.localTotal), part("블로그", e.blogTotal), part("웹문서", e.webTotal)].join(" · "),
+          ...e.errors,
+        ].join(" / "),
+      };
     } catch (err) {
       result.search = { ok: false, detail: err instanceof Error ? err.message : String(err) };
     }
