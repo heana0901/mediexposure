@@ -195,6 +195,8 @@ export type ContentPrescription = {
 };
 
 export type ContentPlan = {
+  /** 처방을 만든 방식의 버전 (바뀌면 저장된 처방을 새로 만든다) */
+  version?: number;
   generatedAt: string;
   /** 이 처방의 근거가 된 가장 최근 실행 */
   runId: string | null;

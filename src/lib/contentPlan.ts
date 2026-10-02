@@ -21,6 +21,8 @@ import type { ContentPlan, ContentPrescription, Source } from "./types";
  */
 
 const PLAN_MODEL = process.env.CONTENT_PLAN_MODEL || "gpt-5.4-mini";
+/** 처방 만드는 방식을 바꾸면 올린다. 저장된 처방의 버전이 다르면 새로 만든다 */
+const PLAN_VERSION = 2;
 /** 한 번에 처방하는 질문 수 */
 const MAX_ITEMS = 3;
 /** 추천 확률이 이 값 이상인 질문은 처방하지 않는다 */
@@ -310,7 +312,7 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
     const note = rows.length
       ? `최근 측정에서 모든 질문의 AI 추천 확률이 ${GOOD_RATE * 100}% 이상입니다. 지금 콘텐츠를 유지하세요.`
       : "아직 측정 결과가 없어 처방을 만들 수 없습니다.";
-    return { plan: { generatedAt, runId, items: [], note }, costUsd: 0 };
+    return { plan: { version: PLAN_VERSION, generatedAt, runId, items: [], note }, costUsd: 0 };
   }
 
   let costUsd = 0;
@@ -356,7 +358,7 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
     })
   );
 
-  return { plan: { generatedAt, runId, items, note: null }, costUsd };
+  return { plan: { version: PLAN_VERSION, generatedAt, runId, items, note: null }, costUsd };
 }
 
 /**
@@ -383,7 +385,7 @@ export async function getContentPlan(
   const cached = cachedQuery.data as { run_id: string | null; plan: ContentPlan } | null;
   const latestRunId = (latestRun?.id as string | undefined) ?? null;
 
-  if (cached && cached.run_id === latestRunId) return cached.plan;
+  if (cached && cached.run_id === latestRunId && cached.plan.version === PLAN_VERSION) return cached.plan;
   if (!generate || !latestRunId) return cached?.plan ?? null;
 
   const { plan, costUsd } = await buildContentPlan(supabase, client);
