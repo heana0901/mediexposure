@@ -31,6 +31,7 @@ export async function recordNaver(
 
   const aliases = Array.isArray(client.aliases) ? client.aliases.filter((a): a is string => typeof a === "string") : [];
   let failed = 0;
+  const reasons = new Set<string>();
   const rows = (
     await Promise.all(
       keywords.map(async (k) => {
@@ -54,6 +55,7 @@ export async function recordNaver(
           };
         } catch (err) {
           failed += 1;
+          reasons.add(err instanceof Error ? err.message : String(err));
           console.error("[naver] 검색 API 실패", query, err);
           return null;
         }
@@ -61,7 +63,7 @@ export async function recordNaver(
     )
   ).filter((r): r is NonNullable<typeof r> => r !== null);
 
-  if (failed) warnings.push(`네이버 검색 API 호출 ${failed}건이 실패했습니다. 키와 호출 한도를 확인하세요.`);
+  if (failed) warnings.push(`네이버 검색 API 호출 ${failed}건 실패: ${[...reasons].join(" / ")}`);
   if (rows.length) {
     const { error } = await supabase.from("naver_results").insert(rows);
     if (error) warnings.push(`네이버 노출 기록을 저장하지 못했습니다(017 마이그레이션 확인): ${error.message}`);

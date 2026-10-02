@@ -352,11 +352,25 @@ export function Dashboard() {
             </div>
           )}
 
-          {runWarnings.length > 0 && (
+          {runWarnings.some((w) => w.startsWith("네이버")) && (
+            <div className="mb-4 text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-4 py-3">
+              <div className="font-medium mb-1">네이버 연동을 확인해 주세요</div>
+              <ul className="list-disc pl-4 space-y-0.5 text-xs leading-relaxed">
+                {runWarnings
+                  .filter((w) => w.startsWith("네이버"))
+                  .map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+              </ul>
+              <div className="text-xs text-sky-700/80 mt-2">AI 노출 결과는 정상적으로 저장됐습니다.</div>
+            </div>
+          )}
+
+          {runWarnings.some((w) => !w.startsWith("네이버")) && (
             <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
               <div className="font-medium mb-1">일부 AI 응답을 받지 못했습니다</div>
               <ul className="list-disc pl-4 space-y-0.5 text-xs leading-relaxed">
-                {runWarnings.map((w) => (
+                {runWarnings.filter((w) => !w.startsWith("네이버")).map((w) => (
                   <li key={w}>{w}</li>
                 ))}
               </ul>

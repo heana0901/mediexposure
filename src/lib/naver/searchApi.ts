@@ -35,9 +35,32 @@ async function search(kind: "local" | "blog" | "webkr", query: string, display: 
     },
     signal: AbortSignal.timeout(8_000),
   });
-  if (!res.ok) throw new Error(`네이버 검색 API 오류 (${res.status})`);
+  if (!res.ok) throw new Error(await describeSearchError(res));
   const json = (await res.json()) as { items?: Item[] };
   return json.items ?? [];
+}
+
+/**
+ * 네이버 검색 API 오류를 원인이 보이는 문장으로.
+ * 401은 Client ID·Secret 불일치, 403은 그 애플리케이션에 '검색' API 권한이 없는 경우가 대부분이다.
+ */
+async function describeSearchError(res: Response): Promise<string> {
+  let detail = "";
+  try {
+    const body = (await res.json()) as { errorMessage?: string; errorCode?: string };
+    detail = [body.errorMessage, body.errorCode && `코드 ${body.errorCode}`].filter(Boolean).join(", ");
+  } catch {
+    // 본문이 JSON이 아니면 상태 코드만 쓴다
+  }
+  const reason =
+    res.status === 401
+      ? "Client ID 또는 Client Secret이 올바르지 않습니다. 네이버 개발자센터 > 내 애플리케이션의 값과 Vercel 환경변수(NAVER_SEARCH_CLIENT_ID·NAVER_SEARCH_CLIENT_SECRET)가 같은지, 둘이 바뀌어 들어가지 않았는지 확인하세요."
+      : res.status === 403
+        ? "이 애플리케이션에 '검색' API 사용 권한이 없습니다. 네이버 개발자센터 > 내 애플리케이션 > API 설정에서 사용 API에 '검색'을 추가하세요."
+        : res.status === 429
+          ? "네이버 검색 API 하루 호출 한도를 넘었습니다."
+          : `네이버 검색 API 오류 (${res.status})`;
+  return detail ? `${reason} (네이버 응답: ${detail})` : reason;
 }
 
 /** 네이버 검색 결과의 <b>…</b> 강조와 HTML 엔티티를 지운다 */
