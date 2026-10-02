@@ -260,7 +260,7 @@ function buildReport(data: ClientReportData) {
         <tr>
           <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};">AI가 말한 위치</td>
           <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};">판정</td>
-          <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};text-align:right;">답변 수</td>
+          <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};text-align:right;white-space:nowrap;">답변 수</td>
         </tr>
         ${locationCheck.claims
           .map(
