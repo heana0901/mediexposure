@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { getAllowedClientIds, verifySession } from "@/lib/dal";
+import { parseAliases } from "@/lib/aliases";
 
 export async function GET() {
   const session = await verifySession();
@@ -25,16 +26,18 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   if (!session.isAdmin) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
 
-  const { name, client_type, region, department, director_name, is_specialist, contact_email, website_url } =
+  const { name, client_type, region, department, director_name, is_specialist, contact_email, website_url, aliases } =
     await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "이름을 입력하세요." }, { status: 400 });
   }
+  const parsedAliases = parseAliases(aliases);
 
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from("clients")
     .insert({
+      ...(parsedAliases?.length ? { aliases: parsedAliases } : {}),
       name: name.trim(),
       client_type: client_type === "business" ? "business" : "hospital",
       region: region?.trim() || null,

@@ -1,5 +1,12 @@
 import type { ClientReportData } from "@/lib/reportData";
 import { PROVIDER_META } from "@/lib/providers";
+import { marginOfError, percent } from "@/lib/stats";
+import type { ExposureTally } from "@/lib/types";
+
+function pctOf(tally: ExposureTally) {
+  const value = percent(tally.count, tally.total);
+  return value === null ? "-" : `${value}%`;
+}
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -15,8 +22,10 @@ type Props = {
 };
 
 export function ReportPrintView({ data }: Props) {
-  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend } = data;
+  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend, metrics, method } =
+    data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
+  const selfMargin = marginOfError(selfExposure.count, selfExposure.total);
   const period =
     weeklyTrend.length > 0
       ? `${fmtDate(weeklyTrend[0].createdAt)} ~ ${fmtDate(weeklyTrend[weeklyTrend.length - 1].createdAt)}`
@@ -48,10 +57,15 @@ export function ReportPrintView({ data }: Props) {
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
         <div style={{ flex: 1, border: "1px solid #e8ebef", borderRadius: 10, padding: 16 }}>
-          <div style={{ fontSize: 12, color: "#8b95a3", marginBottom: 6 }}>{client.name} 노출 빈도</div>
+          <div style={{ fontSize: 12, color: "#8b95a3", marginBottom: 6 }}>{client.name} AI 추천 확률</div>
           <div style={{ fontSize: 26, fontWeight: 700, color: "#16202c" }}>
-            {selfExposure.count}회{" "}
-            <span style={{ fontSize: 13, fontWeight: 400, color: "#8b95a3" }}>({selfRate}%)</span>
+            {selfRate}%
+            {selfMargin !== null && (
+              <span style={{ fontSize: 13, fontWeight: 400, color: "#8b95a3" }}> ±{selfMargin}%p</span>
+            )}{" "}
+            <span style={{ fontSize: 13, fontWeight: 400, color: "#8b95a3" }}>
+              ({selfExposure.count}/{selfExposure.total}회)
+            </span>
           </div>
           <div style={{ fontSize: 12, color: "#8b95a3", marginTop: 6 }}>
             {providers.map((provider, i) => {
@@ -65,6 +79,10 @@ export function ReportPrintView({ data }: Props) {
                 </span>
               );
             })}
+          </div>
+          <div style={{ fontSize: 12, color: "#8b95a3", marginTop: 6 }}>
+            점유율 {pctOf(metrics.shareOfVoice)} · 1순위 추천 {pctOf(metrics.firstPlace)} · 홈페이지 인용{" "}
+            {pctOf(metrics.ownCitation)}
           </div>
         </div>
         <div style={{ flex: 1, border: "1px solid #e8ebef", borderRadius: 10, padding: 16 }}>
@@ -219,6 +237,12 @@ export function ReportPrintView({ data }: Props) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {method && (
+        <div style={{ borderTop: "1px solid #e8ebef", marginTop: 24, paddingTop: 12, fontSize: 11, color: "#8b95a3" }}>
+          {method} ±는 95% 오차범위입니다.
         </div>
       )}
     </div>

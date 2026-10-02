@@ -13,6 +13,8 @@ create table if not exists clients (
   website_url text,
   auto_report_enabled boolean not null default false,
   auto_report_day smallint,
+  -- AI가 부를 수 있는 다른 이름(약칭·영문명·지점명). '노출' 판정 때 함께 찾는다
+  aliases jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -22,7 +24,10 @@ create table if not exists keywords (
   text text not null,
   created_at timestamptz not null default now(),
   -- 지운 질문은 실제로 삭제하지 않는다. 삭제하면 이 질문으로 쌓은 결과까지 사라진다.
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  -- 같은 의도의 다른 표현 (반복 측정 때 회차마다 돌려 가며 묻는다)과 지명 경고
+  variants jsonb not null default '[]'::jsonb,
+  variant_note text
 );
 
 create index if not exists idx_keywords_client_active
@@ -32,6 +37,9 @@ create index if not exists idx_keywords_client_active
 create table if not exists monitoring_runs (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references clients(id) on delete cascade,
+  -- 측정 조건: 질문 방식(natural/list)과 기본 반복 횟수
+  query_mode text,
+  samples int,
   created_at timestamptz not null default now()
 );
 
@@ -45,6 +53,9 @@ create table if not exists monitoring_results (
     check (provider in ('chatgpt', 'gemini', 'perplexity', 'claude')),
   -- 같은 질문을 같은 AI에 반복해서 물은 회차(0부터)
   sample_index int not null default 0,
+  -- 이 회차에 실제로 보낸 표현과 '노출' 판정 근거 문장
+  query_text text,
+  evidence text,
   mentioned boolean not null default false,
   rank int,
   raw_response text,
@@ -58,6 +69,16 @@ create table if not exists monitoring_results (
   searched boolean,
   search_queries jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
+);
+
+-- 건강보험심사평가원 병원정보 조회 결과 캐시 (경쟁 병원 실존 확인)
+create table if not exists hospital_registry (
+  name_key text primary key,
+  query_name text not null,
+  found boolean not null,
+  official_name text,
+  address text,
+  checked_at timestamptz not null default now()
 );
 
 create table if not exists app_users (

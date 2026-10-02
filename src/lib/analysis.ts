@@ -1,11 +1,19 @@
 import OpenAI from "openai";
+import { judgeResponse } from "./nameMatch";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let client: OpenAI | null = null;
+
+function getClient(): OpenAI {
+  client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return client;
+}
 
 export type AnalysisResult = {
   mentioned: boolean;
   rank: number | null;
   competitors: string[];
+  /** 우리 병원이 처음 언급된 문장 (판정 근거). 미노출이면 null */
+  evidence: string | null;
   model: string;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -13,40 +21,31 @@ export type AnalysisResult = {
 
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || "gpt-4o-mini";
 
-const EMPTY_RESULT: AnalysisResult = {
-  mentioned: false,
-  rank: null,
-  competitors: [],
-  model: ANALYSIS_MODEL,
-  inputTokens: null,
-  outputTokens: null,
-};
-
-export async function analyzeResponse(
+/**
+ * AI에게는 '답변에 나온 다른 병원 이름'만 뽑게 한다.
+ * 노출 여부·순위·근거는 답변 원문에서 글자로 확인해 정한다(judgeResponse).
+ * AI에게 노출 여부까지 맡겼을 때 답변에 이름이 없는데도 '노출'로 기록된 일이 있었다.
+ */
+async function extractCompetitors(
   rawText: string,
   clientName: string,
-  clientType: "hospital" | "business" = "hospital"
-): Promise<AnalysisResult> {
-  if (!rawText.trim()) return EMPTY_RESULT;
-
+  clientType: "hospital" | "business"
+): Promise<{ competitors: string[]; inputTokens: number | null; outputTokens: number | null }> {
   const subject = clientType === "hospital" ? "병원" : "업체/브랜드";
 
-  const completion = await client.chat.completions.create({
+  const completion = await getClient().chat.completions.create({
     model: ANALYSIS_MODEL,
     messages: [
       {
         role: "system",
-        content: `너는 AI 응답 텍스트를 분석해서 특정 ${subject}이 언급되었는지, 몇 번째 순서로 언급되었는지, 함께 언급된 다른 ${subject}(경쟁 ${subject}) 이름을 추출하는 도구다. 반드시 JSON으로만 답하라.`,
+        content: `너는 AI 답변에서 ${subject} 상호명을 뽑아내는 도구다. 반드시 JSON으로만 답하라.`,
       },
       {
         role: "user",
-        content: `분석 대상 ${subject}명: "${clientName}"
+        content: `아래 텍스트에 등장하는 ${subject} 상호명을 등장 순서대로 모두 뽑아라. 단 "${clientName}"과 그 변형(띄어쓰기·지점명·'의원' 유무만 다른 이름)은 빼라.
 
-아래는 AI가 특정 키워드에 대해 답변한 텍스트다. 이 텍스트에 분석 대상 ${subject}이 언급되었는지, 언급되었다면 텍스트에 등장한 ${subject}들 중 몇 번째 순서로 언급되었는지(1부터 시작), 그리고 분석 대상 ${subject}을 제외하고 언급된 다른 ${subject}명 목록을 뽑아라.
-
-- 번호 목록이 아닌 일반 문장형 답변이면, 각 ${subject}이 처음 등장한 순서로 순위를 매긴다.
-- 띄어쓰기, "의원/병원/클리닉" 같은 접미사, 지점명 정도만 다른 이름은 같은 곳으로 본다.
-- 질병·치료 설명만 있고 상호명이 없으면 mentioned는 false, competitors는 빈 목록이다.
+- 텍스트에 실제로 적힌 표기 그대로 쓴다. 고치거나 지어내지 않는다.
+- 질병·치료 설명만 있고 상호명이 없으면 빈 목록이다.
 
 텍스트:
 """
@@ -57,40 +56,52 @@ ${rawText}
     response_format: {
       type: "json_schema",
       json_schema: {
-        name: "analysis_result",
+        name: "competitors",
         strict: true,
         schema: {
           type: "object",
-          properties: {
-            mentioned: { type: "boolean" },
-            rank: { type: ["integer", "null"] },
-            competitors: { type: "array", items: { type: "string" } },
-          },
-          required: ["mentioned", "rank", "competitors"],
+          properties: { competitors: { type: "array", items: { type: "string" } } },
+          required: ["competitors"],
           additionalProperties: false,
         },
       },
     },
   });
 
-  const usage = {
-    model: ANALYSIS_MODEL,
+  let competitors: string[] = [];
+  try {
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}") as { competitors?: unknown };
+    if (Array.isArray(parsed.competitors)) {
+      competitors = parsed.competitors.filter((c): c is string => typeof c === "string");
+    }
+  } catch {
+    // 형식이 깨졌으면 경쟁 병원 없이 판정한다
+  }
+
+  return {
+    competitors,
     inputTokens: completion.usage?.prompt_tokens ?? null,
     outputTokens: completion.usage?.completion_tokens ?? null,
   };
+}
 
-  const content = completion.choices[0]?.message?.content;
-  if (!content) return { ...EMPTY_RESULT, ...usage };
-
-  try {
-    const parsed = JSON.parse(content) as AnalysisResult;
-    return {
-      mentioned: Boolean(parsed.mentioned),
-      rank: parsed.rank ?? null,
-      competitors: Array.isArray(parsed.competitors) ? parsed.competitors : [],
-      ...usage,
-    };
-  } catch {
-    return { mentioned: rawText.includes(clientName), rank: null, competitors: [], ...usage };
+export async function analyzeResponse(
+  rawText: string,
+  clientName: string,
+  clientType: "hospital" | "business" = "hospital",
+  aliases: string[] = []
+): Promise<AnalysisResult> {
+  if (!rawText.trim()) {
+    return { mentioned: false, rank: null, competitors: [], evidence: null, model: ANALYSIS_MODEL, inputTokens: null, outputTokens: null };
   }
+
+  const extracted = await extractCompetitors(rawText, clientName, clientType);
+  const judgement = judgeResponse(rawText, clientName, aliases, extracted.competitors);
+
+  return {
+    ...judgement,
+    model: ANALYSIS_MODEL,
+    inputTokens: extracted.inputTokens,
+    outputTokens: extracted.outputTokens,
+  };
 }

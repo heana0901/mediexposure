@@ -42,6 +42,16 @@ export function getSampleCount(): number {
   return Math.min(5, Math.max(1, Math.round(raw)));
 }
 
+/**
+ * 결과가 갈린 질문(예: 3회 중 1~2회 노출)은 이 횟수까지 더 묻는다. 모두 노출이거나 모두 미노출이면
+ * 더 물어도 숫자가 거의 바뀌지 않으니 기본 횟수에서 멈춘다. MONITOR_MAX_SAMPLES (기본 5, 최대 8)
+ */
+export function getMaxSampleCount(): number {
+  const raw = Number(process.env.MONITOR_MAX_SAMPLES ?? 5);
+  if (!Number.isFinite(raw)) return 5;
+  return Math.min(8, Math.max(1, Math.round(raw)));
+}
+
 /** AI별 동시 호출 수. 너무 높으면 제공자 쪽 분당 호출 한도(429)에 걸린다. */
 export function getConcurrency(): number {
   const raw = Number(process.env.MONITOR_CONCURRENCY ?? 6);

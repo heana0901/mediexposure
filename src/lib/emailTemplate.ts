@@ -1,6 +1,13 @@
 import "server-only";
 import type { ClientReportData } from "./reportData";
 import { PROVIDER_META } from "./providers";
+import { marginOfError, percent } from "./stats";
+import type { ExposureTally } from "./types";
+
+function pctOf(tally: ExposureTally) {
+  const value = percent(tally.count, tally.total);
+  return value === null ? "-" : `${value}%`;
+}
 const INK = "#16202c";
 const MUTED = "#8b95a3";
 const LINE = "#e8ebef";
@@ -17,8 +24,10 @@ function pct(n: number | null) {
 }
 
 export function renderReportEmail(data: ClientReportData): { subject: string; html: string } {
-  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend } = data;
+  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend, metrics, method } =
+    data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
+  const selfMargin = marginOfError(selfExposure.count, selfExposure.total);
   const period =
     weeklyTrend.length > 0
       ? `${fmtDate(weeklyTrend[0].createdAt)} ~ ${fmtDate(weeklyTrend[weeklyTrend.length - 1].createdAt)}`
@@ -93,8 +102,8 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       <tr>
         <td style="border:1px solid ${LINE};border-radius:10px;padding:16px;" width="48%">
-          <div style="font-size:12px;color:${MUTED};margin-bottom:6px;">${client.name} 노출 빈도</div>
-          <div style="font-size:26px;font-weight:700;color:${INK};">${selfExposure.count}회 <span style="font-size:13px;font-weight:400;color:${MUTED};">(${selfRate}%)</span></div>
+          <div style="font-size:12px;color:${MUTED};margin-bottom:6px;">${client.name} AI 추천 확률</div>
+          <div style="font-size:26px;font-weight:700;color:${INK};">${selfRate}%${selfMargin !== null ? `<span style="font-size:13px;font-weight:400;color:${MUTED};"> ±${selfMargin}%p</span>` : ""} <span style="font-size:13px;font-weight:400;color:${MUTED};">(${selfExposure.count}/${selfExposure.total}회)</span></div>
           <div style="font-size:12px;color:${MUTED};margin-top:6px;">
             ${providers
               .map((p) => {
@@ -103,6 +112,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
               })
               .join(" · ")}
           </div>
+          <div style="font-size:12px;color:${MUTED};margin-top:6px;">점유율 ${pctOf(metrics.shareOfVoice)} · 1순위 추천 ${pctOf(metrics.firstPlace)} · 홈페이지 인용 ${pctOf(metrics.ownCitation)}</div>
         </td>
         <td width="4%"></td>
         <td style="border:1px solid ${LINE};border-radius:10px;padding:16px;" width="48%">
@@ -158,7 +168,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
     }
 
     <div style="border-top:1px solid ${LINE};padding-top:16px;font-size:11.5px;color:${MUTED};">
-      AI analytics 대시보드에서 발송된 리포트입니다.
+      ${method ? `${method} ±는 95% 오차범위입니다.<br />` : ""}AI analytics 대시보드에서 발송된 리포트입니다.
     </div>
   </div>
 </body>

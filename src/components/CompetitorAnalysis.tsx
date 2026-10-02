@@ -8,10 +8,14 @@ import type {
   SelfExposure,
   SourceFrequencyEntry,
   ResultWithKeyword,
+  VisibilityMetrics,
+  ExposureTally,
 } from "@/lib/types";
+import { marginOfError, MIN_RELIABLE_SAMPLES, percent } from "@/lib/stats";
 import { keywordTextOf } from "@/lib/types";
 import { PROVIDER_META, PROVIDERS, providerKeys, type Provider } from "@/lib/providers";
 import { api } from "@/lib/api";
+import { stripMarkdown } from "@/lib/text";
 import { IconAlertTriangle, IconBuilding, IconTrendingUp, IconLink } from "./icons";
 
 /** AI별 횟수를 색 점과 함께 나란히 보여준다 */
@@ -37,7 +41,39 @@ type Props = {
   sourceFrequency: SourceFrequencyEntry[];
   totalResults: number;
   selfExposure: SelfExposure;
+  metrics?: VisibilityMetrics;
 };
+
+/** "33% ±5%p" — 표본이 적으면 오차범위 대신 '표본 부족'을 붙인다 */
+function RateWithMargin({ tally, className = "" }: { tally: ExposureTally; className?: string }) {
+  const value = percent(tally.count, tally.total);
+  const margin = marginOfError(tally.count, tally.total);
+  if (value === null) return <span className={`text-gray-300 ${className}`}>-</span>;
+  return (
+    <span className={className}>
+      {value}%
+      {tally.total < MIN_RELIABLE_SAMPLES ? (
+        <span className="text-[11px] text-amber-600 font-normal"> 표본 부족</span>
+      ) : (
+        margin !== null && <span className="text-xs text-gray-400 font-normal"> ±{margin}%p</span>
+      )}
+    </span>
+  );
+}
+
+function MetricTile({ title, hint, tally, unit }: { title: string; hint: string; tally: ExposureTally; unit: string }) {
+  return (
+    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4" title={hint}>
+      <div className="text-xs text-gray-500 mb-1">{title}</div>
+      <RateWithMargin tally={tally} className="text-xl font-semibold text-gray-900" />
+      <div className="text-[11px] text-gray-400 mt-1">
+        {tally.count}/{tally.total}
+        {unit}
+      </div>
+      <div className="text-[11px] text-gray-400 mt-1 leading-snug">{hint}</div>
+    </div>
+  );
+}
 
 function UnexposedCard({ result }: { result: ResultWithKeyword }) {
   const [note, setNote] = useState(result.analysis_note);
@@ -88,7 +124,7 @@ function UnexposedCard({ result }: { result: ResultWithKeyword }) {
       )}
 
       {error && <div className="text-xs text-red-500">{error}</div>}
-      {note && <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 mt-1">{note}</div>}
+      {note && <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 mt-1 whitespace-pre-wrap">{stripMarkdown(note)}</div>}
     </div>
   );
 }
@@ -133,7 +169,7 @@ function ContentSuggestions({ clientId }: { clientId: string }) {
       {error && <div className="text-xs text-red-500">{error}</div>}
       {suggestions ? (
         <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-1">
-          {suggestions}
+          {stripMarkdown(suggestions)}
         </div>
       ) : (
         <div className="text-sm text-gray-400 py-4 text-center">
@@ -161,9 +197,9 @@ export function CompetitorAnalysis({
   sourceFrequency,
   totalResults,
   selfExposure,
+  metrics,
 }: Props) {
   const [subTab, setSubTab] = useState<SubTab>("frequency");
-  const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
   const entityLabel = clientType === "hospital" ? "병원" : "업체";
 
@@ -202,6 +238,29 @@ export function CompetitorAnalysis({
         ))}
       </div>
 
+      {subTab === "frequency" && metrics && (
+        <div className="grid sm:grid-cols-3 gap-4 mb-6">
+          <MetricTile
+            title="점유율"
+            hint={`답변에 나온 ${entityLabel} 언급 전체 중 ${clientName} 비중`}
+            tally={metrics.shareOfVoice}
+            unit="회 언급"
+          />
+          <MetricTile
+            title="1순위 추천 비율"
+            hint={`전체 답변 중 ${clientName}이(가) 가장 먼저 언급된 비율`}
+            tally={metrics.firstPlace}
+            unit="건 답변"
+          />
+          <MetricTile
+            title="홈페이지 인용률"
+            hint="출처가 붙은 답변 중 우리 홈페이지가 출처로 쓰인 비율"
+            tally={metrics.ownCitation}
+            unit="건 답변"
+          />
+        </div>
+      )}
+
       {subTab === "frequency" && (
         <div className="grid md:grid-cols-2 gap-6">
           <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4">
@@ -214,9 +273,10 @@ export function CompetitorAnalysis({
               </span>
               <span className="text-xs text-gray-400">전체 {selfExposure.total}건 기준</span>
             </div>
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl font-semibold text-blue-600">{selfExposure.count}회</span>
-              <span className="text-sm text-gray-400">({selfRate}%)</span>
+            <div className="flex items-baseline gap-2 mb-3">
+              <span className="text-xs text-gray-500">AI 추천 확률</span>
+              <RateWithMargin tally={selfExposure} className="text-2xl font-semibold text-blue-600" />
+              <span className="text-sm text-gray-400">({selfExposure.count}회)</span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
               {providers.map((provider) => {
@@ -224,7 +284,7 @@ export function CompetitorAnalysis({
                 const rank = selfRankByProvider(provider);
                 return (
                   <span key={provider}>
-                    {PROVIDER_META[provider].label} {tally.count}/{tally.total}회
+                    {PROVIDER_META[provider].label} <RateWithMargin tally={tally} /> ({tally.count}/{tally.total}회)
                     {rank && <span className="text-blue-600 font-semibold"> · {rank}위</span>}
                   </span>
                 );
@@ -284,7 +344,30 @@ export function CompetitorAnalysis({
                     <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs shrink-0">
                       {i + 1}
                     </span>
-                    <span className="flex-1 text-gray-700 truncate">{c.name}</span>
+                    <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                      <span
+                        className="text-gray-700 truncate"
+                        title={(c.spellings ?? []).length > 1 ? `합친 표기: ${c.spellings!.join(" / ")}` : undefined}
+                      >
+                        {c.name}
+                      </span>
+                      {(c.spellings ?? []).length > 1 && (
+                        <span className="text-[10px] text-gray-400 shrink-0">표기 {c.spellings!.length}개 합침</span>
+                      )}
+                      {c.registry &&
+                        (c.registry.found ? (
+                          <span
+                            className="text-[10px] text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5 shrink-0"
+                            title={[c.registry.officialName, c.registry.address].filter(Boolean).join(" · ")}
+                          >
+                            심평원 등록
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 shrink-0">
+                            등록 정보 없음
+                          </span>
+                        ))}
+                    </span>
                     <span className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
                       <ProviderCountDots counts={c.counts} providers={providers} />
                       <span className="text-gray-400">총 {c.total}회</span>

@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { assertClientAccess } from "@/lib/dal";
 import { selectActiveKeywords } from "@/lib/keywords";
+import { ensureVariants } from "@/lib/keywordVariants";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** 새 질문에 같은 의도의 다른 표현을 만들어 붙인 뒤, 저장된 행을 다시 읽어 돌려준다 */
+async function withVariants(supabase: SupabaseClient, clientId: string, rows: { id: string; text: string; variants?: unknown }[]) {
+  const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).maybeSingle();
+  await ensureVariants(supabase, rows, client ?? {});
+  const { data } = await supabase.from("keywords").select("*").in("id", rows.map((r) => r.id));
+  const byId = new Map((data ?? []).map((r) => [r.id, r]));
+  return rows.map((r) => byId.get(r.id) ?? r);
+}
 
 export async function GET(
   _request: Request,
@@ -43,7 +54,7 @@ export async function POST(
       .select();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
+    return NextResponse.json(await withVariants(supabase, id, data ?? []));
   }
 
   const { text } = body;
@@ -58,5 +69,6 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  const [withNote] = await withVariants(supabase, id, [data]);
+  return NextResponse.json(withNote);
 }

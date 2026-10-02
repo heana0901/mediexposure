@@ -14,6 +14,9 @@ import {
   type SiteDiagnosis,
 } from "@/lib/diagnose-shared";
 import { IconGlobe, IconCheck, IconAlertTriangle, IconX, IconLoader, IconBookmark } from "./icons";
+import { SiteAuditHistory } from "./SiteAuditHistory";
+import { stripMarkdown } from "@/lib/text";
+import type { SiteAuditHistoryEntry } from "@/lib/types";
 
 const STATUS_STYLE: Record<CheckStatus, { badge: string; label: string; Icon: typeof IconCheck }> = {
   pass: { badge: "bg-green-50 text-green-600", label: "이상 없음", Icon: IconCheck },
@@ -186,6 +189,7 @@ export function SiteAudit({
   const [savingUrl, setSavingUrl] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [openAxis, setOpenAxis] = useState<Axis | "all">("all");
+  const [history, setHistory] = useState<SiteAuditHistoryEntry[]>([]);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 선택된 클라이언트가 바뀌면(사이드바에서 다른 병원 선택) 그 병원에 저장된 URL로 초기화
@@ -196,6 +200,7 @@ export function SiteAudit({
     setCompetitorUrls([]);
     setResult(null);
     setResultDate(null);
+    setHistory([]);
   }
 
   // 그 병원에 저장된 마지막 분석 기록을 불러온다 (새로 분석하기 전까지는 이 기록을 보여줌)
@@ -212,6 +217,10 @@ export function SiteAudit({
           setCompetitorUrls(saved.urls.slice(1));
         }
       })
+      .catch(() => {});
+    api
+      .getSiteAuditHistory(clientId)
+      .then((list) => !cancelled && setHistory(list))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -268,6 +277,7 @@ export function SiteAudit({
       const data = await api.runSiteAudit(urls, clientId ?? undefined);
       setResult(data);
       setResultDate(new Date().toISOString());
+      if (clientId) api.getSiteAuditHistory(clientId).then(setHistory).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -411,6 +421,8 @@ export function SiteAudit({
                 </div>
               )}
 
+              {clientId && <SiteAuditHistory history={history} />}
+
               {primary.priorities.length > 0 && (
                 <div
                   className="animate-fade-in-up border border-gray-100 rounded-xl bg-white shadow-sm p-4"
@@ -538,7 +550,7 @@ export function SiteAudit({
                 {isComparison ? "AI 검색 관점 비교 진단" : "AI 검색 관점 진단"}
               </div>
               <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
-                {result.aiComment}
+                {stripMarkdown(result.aiComment)}
               </div>
             </div>
           )}

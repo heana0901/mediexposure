@@ -49,6 +49,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
   );
   const [contactEmail, setContactEmail] = useState(client?.contact_email ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(client?.website_url ?? "");
+  const [aliases, setAliases] = useState((client?.aliases ?? []).join(", "));
   const [saving, setSaving] = useState(false);
 
   const labels = TYPE_LABELS[clientType];
@@ -66,6 +67,10 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         is_specialist: clientType === "hospital" ? (isSpecialist === "unknown" ? null : isSpecialist === "yes") : null,
         contact_email: contactEmail.trim() || undefined,
         website_url: websiteUrl.trim() || undefined,
+        aliases: aliases
+          .split(",")
+          .map((a) => a.trim())
+          .filter(Boolean),
       });
       onClose();
     } finally {
@@ -105,6 +110,19 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
             onChange={(e) => setName(e.target.value)}
             placeholder={labels.namePlaceholder}
           />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-gray-500">
+          다른 이름 (쉼표로 구분)
+          <input
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+            value={aliases}
+            onChange={(e) => setAliases(e.target.value)}
+            placeholder="예: 엘츠의원, ELZ Clinic, 엘츠 천안점"
+          />
+          <span className="text-[11px] text-gray-400">
+            AI가 다르게 부를 수 있는 약칭·영문명·지점명. 답변에 이 이름이 있어도 노출로 셉니다.
+          </span>
         </label>
 
         <label className="flex flex-col gap-1 text-xs text-gray-500">

@@ -7,10 +7,12 @@ import type {
   TrendPoint,
   UsageSummary,
   SelfExposure,
+  VisibilityMetrics,
   CompetitorFrequencyEntry,
   SourceFrequencyEntry,
   AppUser,
   AppUserInput,
+  SiteAuditHistoryEntry,
 } from "./types";
 import type { ClientReportData } from "./reportData";
 import type { SiteComparisonResult } from "./diagnose-shared";
@@ -98,6 +100,7 @@ export const api = {
         sourceFrequency: SourceFrequencyEntry[];
         totalResults: number;
         selfExposure: SelfExposure;
+        metrics: VisibilityMetrics;
       }>(r)
     ),
 
@@ -157,6 +160,9 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ urls, clientId }),
     }).then((r) => json<SiteComparisonResult>(r)),
+
+  getSiteAuditHistory: (clientId: string) =>
+    fetch(`/api/site-audit/history?clientId=${clientId}`).then((r) => json<SiteAuditHistoryEntry[]>(r)),
 
   getLatestSiteAudit: (clientId: string) =>
     fetch(`/api/site-audit?clientId=${clientId}`).then((r) =>

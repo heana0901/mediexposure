@@ -9,15 +9,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const PAGE_SIZE = 1000;
 
 /** 집계에 필요한 가벼운 컬럼만. 원문 응답(raw_response)은 무거워서 빼 둔다. */
-export const AGGREGATE_COLUMNS = "id, run_id, provider, mentioned, competitors, sources, created_at";
+export const AGGREGATE_COLUMNS = "id, run_id, provider, mentioned, rank, competitors, sources, model, created_at";
 
 export type AggregateRow = {
   id: string;
   run_id: string;
   provider: string;
   mentioned: boolean;
+  rank: number | null;
   competitors: string[] | null;
   sources: { title: string; url: string }[] | null;
+  model: string | null;
   created_at: string;
 };
 

@@ -100,21 +100,28 @@ export function KeywordManager({ keywords, onAddKeyword, onAddKeywordsBulk, onDe
       )}
 
       {keywords.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="space-y-2 mb-3">
           {keywords.map((k) => (
-            <span
-              key={k.id}
-              className="flex items-center gap-1 bg-gray-100 text-sm rounded-full px-3 py-1"
-            >
-              {k.text}
-              <button
-                className="text-gray-400 hover:text-red-500"
-                onClick={() => onDeleteKeyword(k.id)}
-                aria-label="삭제"
-              >
-                ×
-              </button>
-            </span>
+            <div key={k.id}>
+              <span className="inline-flex items-center gap-1 bg-gray-100 text-sm rounded-full px-3 py-1">
+                {k.text}
+                <button
+                  className="text-gray-400 hover:text-red-500"
+                  onClick={() => onDeleteKeyword(k.id)}
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </span>
+              {(k.variants ?? []).length > 0 && (
+                <div className="text-[11px] text-gray-400 mt-1 ml-3">
+                  함께 묻는 표현: {(k.variants ?? []).join(" · ")}
+                </div>
+              )}
+              {k.variant_note && (
+                <div className="text-[11px] text-amber-600 mt-1 ml-3">⚠ {k.variant_note}</div>
+              )}
+            </div>
           ))}
         </div>
       )}

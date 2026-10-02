@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { TrendPoint } from "@/lib/types";
+import type { ExposureTally, TrendPoint } from "@/lib/types";
 import { PROVIDER_META, PROVIDERS, type Provider } from "@/lib/providers";
+import { marginOfError, percent, significantChange } from "@/lib/stats";
 
 type Props = {
   data: TrendPoint[];
@@ -16,9 +17,8 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 }
 
-function average(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return Math.round(values.reduce((sum, v) => sum + v, 0) / values.length);
+function addTally(a: ExposureTally | undefined, b: ExposureTally | undefined): ExposureTally {
+  return { count: (a?.count ?? 0) + (b?.count ?? 0), total: (a?.total ?? 0) + (b?.total ?? 0) };
 }
 
 /** 한 번이라도 측정한 AI만 표준 순서대로 */
@@ -30,6 +30,7 @@ function rateOf(point: TrendPoint, provider: Provider): number | null {
   return point.rates[provider] ?? null;
 }
 
+/** 월별로 노출/측정 횟수를 합쳐 비율을 낸다(실행마다 측정 횟수가 달라 단순 평균보다 정확하다) */
 function computeMonthlyTable(data: TrendPoint[], providers: Provider[]) {
   const groups = new Map<string, TrendPoint[]>();
   for (const point of data) {
@@ -50,15 +51,21 @@ function computeMonthlyTable(data: TrendPoint[], providers: Provider[]) {
       const month = i + 1;
       const key = `${year}-${String(month).padStart(2, "0")}`;
       const points = groups.get(key) ?? [];
-      const averages = Object.fromEntries(
-        providers.map((p) => [
-          p,
-          average(points.map((point) => rateOf(point, p)).filter((v): v is number => v !== null)),
-        ])
-      ) as Record<Provider, number | null>;
-      return { month, averages };
+      const tallies = Object.fromEntries(
+        providers.map((p) => [p, points.reduce<ExposureTally>((acc, point) => addTally(acc, point.counts?.[p]), { count: 0, total: 0 })])
+      ) as Record<Provider, ExposureTally>;
+      return { month, tallies };
     }),
   }));
+}
+
+/** 직전 달(측정이 있는 달)보다 의미 있게 오르거나 내렸으면 화살표 */
+function changeMark(prev: ExposureTally | null, cur: ExposureTally) {
+  if (!prev || prev.total === 0 || cur.total === 0) return null;
+  const change = significantChange(prev.count, prev.total, cur.count, cur.total);
+  if (change === 1) return <span className="text-emerald-600 text-[10px] ml-0.5">▲</span>;
+  if (change === -1) return <span className="text-red-500 text-[10px] ml-0.5">▼</span>;
+  return null;
 }
 
 function buildLine(points: (number | null)[], x: (i: number) => number, y: (v: number) => number) {
@@ -95,7 +102,10 @@ export function TrendChart({ data }: Props) {
 
   const monthlySummary = (
     <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 space-y-4">
-      <div className="text-sm font-medium text-gray-700">월별 평균 언급률</div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="text-sm font-medium text-gray-700">월별 AI 추천 확률</div>
+        <div className="text-[11px] text-gray-400">▲▼ 우연으로 보기 어려운 변화(95% 기준)만 표시</div>
+      </div>
       {monthlyTable.map(({ year, months }) => (
         <div key={year} className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
@@ -115,7 +125,9 @@ export function TrendChart({ data }: Props) {
               </tr>
             </thead>
             <tbody>
-              {providers.map((provider) => (
+              {providers.map((provider) => {
+                let prev: ExposureTally | null = null;
+                return (
                 <tr key={provider} className="border-t border-gray-100">
                   <td className="py-1.5 pr-3 whitespace-nowrap">
                     <span className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -126,17 +138,25 @@ export function TrendChart({ data }: Props) {
                       {PROVIDER_META[provider].label}
                     </span>
                   </td>
-                  {months.map((m) => (
-                    <td key={m.month} className="text-center py-1.5 px-2 text-gray-700">
-                      {m.averages[provider] === null ? (
-                        <span className="text-gray-300">-</span>
-                      ) : (
-                        `${m.averages[provider]}%`
-                      )}
-                    </td>
-                  ))}
+                  {months.map((m) => {
+                    const tally = m.tallies[provider];
+                    const value = percent(tally.count, tally.total);
+                    const mark = value === null ? null : changeMark(prev, tally);
+                    if (value !== null) prev = tally;
+                    return (
+                      <td
+                        key={m.month}
+                        className="text-center py-1.5 px-2 text-gray-700 whitespace-nowrap"
+                        title={value === null ? undefined : `${tally.count}/${tally.total}회 · 오차범위 ±${marginOfError(tally.count, tally.total)}%p`}
+                      >
+                        {value === null ? <span className="text-gray-300">-</span> : `${value}%`}
+                        {mark}
+                      </td>
+                    );
+                  })}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -262,6 +282,25 @@ export function TrendChart({ data }: Props) {
             </g>
           ))}
 
+          {data.map((d, i) =>
+            d.conditionChanged ? (
+              <g key={`cond-${d.runId}`}>
+                <line
+                  x1={x(i)}
+                  x2={x(i)}
+                  y1={PADDING.top}
+                  y2={HEIGHT - PADDING.bottom}
+                  stroke="#f59e0b"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                />
+                <text x={x(i) + 4} y={PADDING.top + 10} fontSize={10} fill="#d97706">
+                  측정 방식 변경
+                </text>
+              </g>
+            ) : null
+          )}
+
           {hoverIndex !== null && (
             <g>
               <line
@@ -282,14 +321,30 @@ export function TrendChart({ data }: Props) {
             <span className="font-medium">{formatDate(data[hoverIndex].createdAt)}</span>
             {providers.map((provider) => {
               const value = rateOf(data[hoverIndex], provider);
+              const tally = data[hoverIndex].counts?.[provider];
+              const margin = tally ? marginOfError(tally.count, tally.total) : null;
               return value === null ? null : (
                 <span key={provider} className="ml-3">
                   {PROVIDER_META[provider].label} {value}%
+                  {tally && (
+                    <span className="text-gray-400">
+                      {" "}
+                      ({tally.count}/{tally.total}
+                      {margin !== null ? ` · ±${margin}%p` : ""})
+                    </span>
+                  )}
                 </span>
               );
             })}
+            {data[hoverIndex].condition && (
+              <div className="text-[11px] text-gray-400 mt-1">측정 조건: {data[hoverIndex].condition}</div>
+            )}
           </div>
         )}
+        <div className="text-[11px] text-gray-400 mt-2">
+          한 번의 실행은 표본이 적어 들쭉날쭉합니다. 주황 점선은 질문 방식·모델·반복 횟수가 바뀐 시점이라 그 앞뒤 수치를
+          그대로 비교하기 어렵습니다.
+        </div>
       </div>
     </div>
   );

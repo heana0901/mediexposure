@@ -11,6 +11,7 @@ import type {
   TrendPoint,
   UsageSummary,
   SelfExposure,
+  VisibilityMetrics,
   CompetitorFrequencyEntry,
   SourceFrequencyEntry,
   ResultWithKeyword,
@@ -61,6 +62,7 @@ export function Dashboard() {
     sourceFrequency: SourceFrequencyEntry[];
     totalResults: number;
     selfExposure: SelfExposure;
+    metrics?: VisibilityMetrics;
   }>({
     unexposed: [],
     competitorFrequency: [],
@@ -382,6 +384,7 @@ export function Dashboard() {
                   />
                   <ExposureStatus
                     clientName={selectedClient?.name ?? ""}
+                    clientAliases={selectedClient?.aliases ?? []}
                     clientType={selectedClient?.client_type ?? "hospital"}
                     results={results}
                     runs={runs}
@@ -401,6 +404,7 @@ export function Dashboard() {
                   sourceFrequency={competitorData.sourceFrequency}
                   totalResults={competitorData.totalResults}
                   selfExposure={competitorData.selfExposure}
+                  metrics={competitorData.metrics}
                 />
               )}
 

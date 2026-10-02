@@ -4,10 +4,14 @@ import { useMemo, useState } from "react";
 import type { ClientType, MonitoringRun, ResultWithKeyword } from "@/lib/types";
 import { keywordTextOf } from "@/lib/types";
 import { PROVIDER_META, providersIn, type Provider } from "@/lib/providers";
+import { clientNameVariants } from "@/lib/nameMatch";
+import { marginOfError } from "@/lib/stats";
+import { stripMarkdown } from "@/lib/text";
 import { IconEye, IconLink } from "./icons";
 
 type Props = {
   clientName: string;
+  clientAliases?: string[];
   clientType: ClientType;
   results: ResultWithKeyword[];
   runs: MonitoringRun[];
@@ -40,18 +44,21 @@ function averageRank(samples: ResultWithKeyword[]): number | null {
   return Math.round((ranks.reduce((a, b) => a + b, 0) / ranks.length) * 10) / 10;
 }
 
-function highlight(text: string, clientName: string) {
-  if (!clientName) return text;
-  const parts = text.split(clientName);
-  return parts.flatMap((part, i) =>
-    i === 0
-      ? [part]
-      : [
-          <mark key={i} className="bg-yellow-200 rounded px-0.5">
-            {clientName}
-          </mark>,
-          part,
-        ]
+/** 우리 병원 이름(별칭·띄어쓰기 차이 포함)을 노란색으로 표시한다 */
+function highlight(text: string, names: string[]) {
+  const patterns = names
+    .filter(Boolean)
+    .map((n) => [...n].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*"));
+  if (patterns.length === 0) return text;
+  const re = new RegExp(`(${patterns.join("|")})`, "gi");
+  return text.split(re).map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="bg-yellow-200 rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
   );
 }
 
@@ -99,12 +106,12 @@ function ProviderTile({
 }
 
 function KeywordCard({
-  clientName,
+  nameVariants,
   clientType,
   keywordText,
   results,
 }: {
-  clientName: string;
+  nameVariants: string[];
   clientType: ClientType;
   keywordText: string;
   results: ResultWithKeyword[];
@@ -113,6 +120,7 @@ function KeywordCard({
   const providers = providersIn(results);
   const mentionedCount = results.filter((r) => r.mentioned).length;
   const overallRate = Math.round((mentionedCount / results.length) * 100);
+  const margin = marginOfError(mentionedCount, results.length);
 
   const [activeProvider, setActiveProvider] = useState<Provider>(
     providers.find((p) => results.some((r) => r.provider === p && r.mentioned)) ?? providers[0]
@@ -133,8 +141,9 @@ function KeywordCard({
     <div className="border border-gray-100 rounded-xl bg-white overflow-hidden shadow-sm">
       <div className="p-4 border-b border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium text-sm text-gray-800">{keywordText}</span>
-        <span className="text-xs text-gray-500">
-          전체 노출 확률 <b className="text-gray-800">{overallRate}%</b> ({mentionedCount}/{results.length}회)
+        <span className="text-xs text-gray-500" title="같은 질문을 다시 물으면 이 범위 안에서 달라질 수 있습니다 (95% 신뢰구간)">
+          AI 추천 확률 <b className="text-gray-800">{overallRate}%</b>
+          {margin !== null && <span className="text-gray-400"> ±{margin}%p</span>} ({mentionedCount}/{results.length}회)
         </span>
       </div>
 
@@ -168,8 +177,18 @@ function KeywordCard({
               </button>
             ))}
         </div>
+        {active.query_text && active.query_text !== active.keyword_text && (
+          <div className="text-xs text-gray-500 mb-2">
+            이 회차에 보낸 질문: <span className="text-gray-700">{active.query_text}</span>
+          </div>
+        )}
+        {active.mentioned && active.evidence && (
+          <div className="text-xs text-blue-700 bg-blue-50 rounded-lg px-3 py-2 mb-2">
+            판정 근거: {active.evidence}
+          </div>
+        )}
         <div className="border border-gray-100 rounded-lg p-3 max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap bg-gray-50/60">
-          {active.raw_response ? highlight(active.raw_response, clientName) : "응답 없음"}
+          {active.raw_response ? highlight(stripMarkdown(active.raw_response), nameVariants) : "응답 없음"}
         </div>
         {active.competitors.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
@@ -216,8 +235,17 @@ function KeywordCard({
   );
 }
 
-export function ExposureStatus({ clientName, clientType, results, runs, selectedRunId, onSelectRun }: Props) {
+export function ExposureStatus({
+  clientName,
+  clientAliases = [],
+  clientType,
+  results,
+  runs,
+  selectedRunId,
+  onSelectRun,
+}: Props) {
   const groups = useMemo(() => groupByKeyword(results), [results]);
+  const nameVariants = useMemo(() => clientNameVariants(clientName, clientAliases), [clientName, clientAliases]);
 
   return (
     <div className="space-y-4">
@@ -248,7 +276,7 @@ export function ExposureStatus({ clientName, clientType, results, runs, selected
         groups.map(([keywordId, group]) => (
           <KeywordCard
             key={keywordId}
-            clientName={clientName}
+            nameVariants={nameVariants}
             clientType={clientType}
             keywordText={keywordTextOf(group[0])}
             results={group}

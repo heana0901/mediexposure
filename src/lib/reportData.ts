@@ -1,10 +1,17 @@
 import "server-only";
 import { getSupabaseServerClient } from "./supabase";
 import { getRecentRunIds, dedupeUnexposed } from "./recentUnexposed";
-import { competitorFrequency, EMPTY_SELF_EXPOSURE, rate, ratesByProvider, selfExposure as tallySelf } from "./aggregate";
+import {
+  competitorFrequency,
+  EMPTY_SELF_EXPOSURE,
+  rate,
+  ratesByProvider,
+  selfExposure as tallySelf,
+  visibilityMetrics,
+} from "./aggregate";
 import { fetchAllPages, fetchClientResults } from "./clientResults";
-import { isProvider, providersIn, type Provider } from "./providers";
-import type { CompetitorFrequencyEntry, ResultWithKeyword, SelfExposure } from "./types";
+import { isProvider, PROVIDER_META, providersIn, type Provider } from "./providers";
+import type { CompetitorFrequencyEntry, ResultWithKeyword, SelfExposure, VisibilityMetrics } from "./types";
 import { keywordTextOf } from "./types";
 
 export type ClientReportData = {
@@ -24,6 +31,14 @@ export type ClientReportData = {
   unexposedRecent: { provider: Provider; keyword: string; competitors: string[] }[];
   unexposedCount: number;
   weeklyTrend: { createdAt: string; rates: Partial<Record<Provider, number>>; overallRate: number | null }[];
+  metrics: VisibilityMetrics;
+  /** 리포트 하단에 적는 측정 방법 한 줄 (최근 실행 기준) */
+  method: string | null;
+};
+
+const MODE_LABEL: Record<string, string> = {
+  natural: "환자가 검색창에 치는 문장 그대로",
+  list: "추천 목록 형식으로",
 };
 
 export async function getClientReportData(clientId: string): Promise<ClientReportData> {
@@ -31,7 +46,7 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
 
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, client_type, region, department, director_name, contact_email")
+    .select("*")
     .eq("id", clientId)
     .single();
   if (clientError || !client) throw new Error(clientError?.message ?? "클라이언트를 찾을 수 없습니다.");
@@ -47,6 +62,8 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
       unexposedRecent: [],
       unexposedCount: 0,
       weeklyTrend: [],
+      metrics: visibilityMetrics([], client.website_url),
+      method: null,
     };
   }
 
@@ -70,11 +87,12 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
     competitors: r.competitors ?? [],
   }));
 
-  const { data: runs } = await supabase
+  const runsQuery = await supabase
     .from("monitoring_runs")
-    .select("id, created_at")
+    .select("*")
     .eq("client_id", clientId)
     .order("created_at", { ascending: true });
+  const runs = (runsQuery.data ?? []) as { id: string; created_at: string; query_mode?: string | null; samples?: number | null }[];
 
   // 같은 날짜에 여러 번 실행됐으면 그날의 결과를 모두 합쳐서 하나로 집계한다
   const runDateById = new Map((runs ?? []).map((r) => [r.id, r.created_at.slice(0, 10)]));
@@ -93,11 +111,27 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
     return { createdAt: dateKey, rates: ratesByProvider(forDate), overallRate: rate(forDate) };
   });
 
+  const aliases: string[] = Array.isArray(client.aliases) ? client.aliases : [];
+
+  // 측정 방법: 가장 최근 실행의 질문 방식·반복 횟수·AI 모델
+  const latestRun = [...runs].reverse().find((r) => allResults.some((x) => x.run_id === r.id));
+  let method: string | null = null;
+  if (latestRun) {
+    const latestRows = allResults.filter((r) => r.run_id === latestRun.id);
+    const models = new Map<string, string>();
+    for (const r of latestRows) if (isProvider(r.provider) && r.model) models.set(PROVIDER_META[r.provider].label, r.model);
+    const mode = MODE_LABEL[latestRun.query_mode ?? "list"];
+    const samples = latestRun.samples ?? 1;
+    method = `측정 방법: ${[...models].map(([p, m]) => `${p}(${m})`).join(" · ")}에 ${mode} 질문을 ${samples}회씩 묻고, 답변 원문에 병원 이름이 실제로 있을 때만 노출로 집계했습니다.`;
+  }
+
   return {
     client,
     providers: providersIn(allResults),
     selfExposure: tallySelf(allResults),
-    competitorTop5: competitorFrequency(allResults).slice(0, 5),
+    competitorTop5: competitorFrequency(allResults, { name: client.name, aliases }).slice(0, 5),
+    metrics: visibilityMetrics(allResults, client.website_url),
+    method,
     unexposedRecent,
     unexposedCount: unexposedAll.length,
     weeklyTrend,

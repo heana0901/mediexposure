@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
   const { data: clients, error: clientsError } = await supabase
     .from("clients")
-    .select("id, name, client_type, region, contact_email, auto_report_enabled, auto_report_day");
+    .select("*");
   if (clientsError) {
     return NextResponse.json({ error: clientsError.message }, { status: 500 });
   }
