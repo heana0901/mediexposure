@@ -16,7 +16,7 @@ const CALL_BUDGET_MS = 200_000;
 const CLIENT_CONCURRENCY = 3;
 
 /*
- * 자동 모니터링 주기: 계정 관리에서 정한 병원별 주기(clients.monitor_interval_days), 없으면 기본 5일.
+ * 자동 모니터링 주기: 계정 관리에서 정한 병원별 주기(clients.monitor_interval_days), 없으면 기본 7일.
  *
  * cron 표현식의 "N일마다" 문법은 매월 1일 기준으로 날짜를 맞추는 방식이라,
  * 월말과 다음 달 1일이 연달아 걸리고 병원마다 다르게 줄 수도 없습니다.

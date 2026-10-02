@@ -1,11 +1,11 @@
 /** 자동 모니터링 기본 주기(일). 병원별 주기를 정하지 않은 클라이언트에 쓴다 */
-export const DEFAULT_INTERVAL_DAYS = 5;
+export const DEFAULT_INTERVAL_DAYS = 7;
 
 /** 병원별 주기로 고를 수 있는 값(일) */
 export const INTERVAL_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 30] as const;
 
 /**
- * 기본 자동 모니터링 주기(일). MONITOR_INTERVAL_DAYS로 바꿀 수 있고, 비어 있거나 잘못된 값이면 5일.
+ * 기본 자동 모니터링 주기(일). MONITOR_INTERVAL_DAYS로 바꿀 수 있고, 비어 있거나 잘못된 값이면 7일.
  * cron은 매일 깨우고, 마지막 실행 후 이 주기가 지난 클라이언트만 다시 돌린다.
  */
 export function getIntervalDays(): number {

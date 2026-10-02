@@ -20,7 +20,7 @@ export type Client = {
   aliases?: string[];
   /** 병원 네이버 블로그 주소 (017) */
   naver_blog_url?: string | null;
-  /** 자동 모니터링 주기(일). 없으면 기본 주기(5일) (018) */
+  /** 자동 모니터링 주기(일). 없으면 기본 주기(7일) (018) */
   monitor_interval_days?: number | null;
   created_at: string;
 };

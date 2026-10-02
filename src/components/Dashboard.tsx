@@ -140,14 +140,16 @@ export function Dashboard() {
 
   async function handleCreateClient(input: ClientInput) {
     const client = await api.createClient(input);
-    setClients((prev) => [...prev, client]);
+    setClients((prev) => [...prev, client].sort((a, b) => a.name.localeCompare(b.name, "ko")));
     setSelectedClientId(client.id);
   }
 
   async function handleUpdateClient(input: ClientInput) {
     if (!selectedClientId) return;
     const updated = await api.updateClient(selectedClientId, input);
-    setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setClients((prev) =>
+      prev.map((c) => (c.id === updated.id ? updated : c)).sort((a, b) => a.name.localeCompare(b.name, "ko"))
+    );
   }
 
   async function handleUpdateClientWebsiteUrl(client: Client, url: string) {

@@ -10,7 +10,7 @@ export async function GET() {
   const supabase = getSupabaseServerClient();
   const allowedIds = await getAllowedClientIds(session);
 
-  let query = supabase.from("clients").select("*").order("created_at", { ascending: true });
+  let query = supabase.from("clients").select("*");
   if (allowedIds !== null) {
     if (allowedIds.length === 0) return NextResponse.json([]);
     query = query.in("id", allowedIds);
@@ -18,7 +18,8 @@ export async function GET() {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  // 가나다순. DB 정렬은 콜레이션에 따라 달라질 수 있어 여기서 한국어 기준으로 맞춘다
+  return NextResponse.json((data ?? []).sort((a, b) => a.name.localeCompare(b.name, "ko")));
 }
 
 export async function POST(request: Request) {
