@@ -1,6 +1,6 @@
 /** 리포트에 넣을 수 있는 항목. 계정 관리에서 병원마다 고른다 */
 export const REPORT_SECTIONS = [
-  { key: "exposure", label: "AI 노출현황", detail: "AI 추천 확률 · 질문별 현황(검색량 · 네이버 순위)" },
+  { key: "exposure", label: "AI 노출현황", detail: "AI 추천 확률 · AI가 잘못 알고 있는 위치 · 질문별 현황(검색량 · 네이버 순위)" },
   { key: "competitors", label: "경쟁분석", detail: "경쟁병원 TOP 5 · 콘텐츠 처방" },
   { key: "trends", label: "추이분석", detail: "노출률 추이" },
   { key: "site", label: "홈페이지", detail: "AI 친화 점수 · 먼저 고칠 것" },

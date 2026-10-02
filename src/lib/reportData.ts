@@ -17,7 +17,7 @@ import { demandSummary } from "./naver/demand";
 import { getContentPlan } from "./contentPlan";
 import { buildFixItems } from "./siteFixGuide";
 import { isLegacySite, type SiteComparisonResult, type SiteDiagnosis } from "./diagnose-shared";
-import type { ContentPlan, ExposureTally } from "./types";
+import type { ContentPlan, ExposureTally, LocationCheck } from "./types";
 import { parseReportSections, type ReportSection } from "./reportSections";
 
 export type ClientReportData = {
@@ -47,6 +47,8 @@ export type ClientReportData = {
   questions: ReportQuestion[];
   /** 콘텐츠 처방 (최근 실행 기준) */
   contentPlan: ContentPlan | null;
+  /** AI가 잘못 알고 있는 우리 병원 위치 (AI 노출현황에 들어간다) */
+  locationCheck: LocationCheck | null;
   /** 가장 최근 홈페이지 분석 점수와 먼저 고칠 항목 */
   siteAudit: ReportSiteAudit | null;
 };
@@ -190,6 +192,7 @@ export async function getClientReportData(
       method: null,
       questions: [],
       contentPlan: null,
+      locationCheck: null,
       siteAudit: wants("site") ? await latestSiteAudit(supabase, client) : null,
     };
   }
@@ -259,7 +262,8 @@ export async function getClientReportData(
           recentRunIds
         )
       : [],
-    wants("competitors")
+    // 처방과 위치 확인은 실행마다 함께 만들어 저장한다
+    wants("competitors") || wants("exposure")
       ? getContentPlan(supabase, client, { generate: generatePlan }).catch((err) => {
           console.error("[report] 콘텐츠 처방 실패", err);
           return null;
@@ -283,7 +287,8 @@ export async function getClientReportData(
     unexposedCount: unexposedAll.length,
     weeklyTrend,
     questions,
-    contentPlan,
+    contentPlan: wants("competitors") ? contentPlan : null,
+    locationCheck: wants("exposure") ? (contentPlan?.locationCheck ?? null) : null,
     siteAudit,
   };
 }

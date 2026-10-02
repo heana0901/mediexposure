@@ -9,6 +9,7 @@ import { selectActiveKeywords } from "./keywords";
 import { stripMarkdown } from "./text";
 import { estimateCostUsd } from "./pricing";
 import { isProvider } from "./providers";
+import { checkLocations } from "./locationCheck";
 import type { ContentPlan, ContentPrescription, Source } from "./types";
 
 /**
@@ -22,7 +23,7 @@ import type { ContentPlan, ContentPrescription, Source } from "./types";
 
 const PLAN_MODEL = process.env.CONTENT_PLAN_MODEL || "gpt-5.4-mini";
 /** 처방 만드는 방식을 바꾸면 올린다. 저장된 처방의 버전이 다르면 새로 만든다 */
-const PLAN_VERSION = 3;
+const PLAN_VERSION = 4;
 /** 한 번에 처방하는 질문 수 */
 const MAX_ITEMS = 3;
 /** 추천 확률이 이 값 이상인 질문은 처방하지 않는다 */
@@ -55,6 +56,7 @@ type Row = {
   competitors: string[] | null;
   sources: Source[] | null;
   raw_response: string | null;
+  query_text?: string | null;
 };
 
 type KeywordRow = { id: string; text: string; search_keyword?: string | null; search_volume?: number | null };
@@ -281,7 +283,7 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
     ? await fetchAllPages<Row>((from, to) =>
         supabase
           .from("monitoring_results")
-          .select("id, run_id, keyword_id, provider, mentioned, competitors, sources, raw_response")
+          .select("id, run_id, keyword_id, provider, mentioned, competitors, sources, raw_response, query_text")
           .in("run_id", [...recentRunIds])
           .not("keyword_id", "is", null)
           .order("id", { ascending: true })
@@ -311,11 +313,17 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
     })
     .slice(0, MAX_ITEMS);
 
+  // AI가 잘못 알고 있는 우리 병원 위치 (처방과 함께 저장해 화면·리포트가 같이 쓴다)
+  const locationCheck = await checkLocations(client, rows).catch((err) => {
+    console.error("[contentPlan] 위치 확인 실패", err);
+    return null;
+  });
+
   if (candidates.length === 0) {
     const note = rows.length
       ? `최근 측정에서 모든 질문의 AI 추천 확률이 ${GOOD_RATE * 100}% 이상입니다. 지금 콘텐츠를 유지하세요.`
       : "아직 측정 결과가 없어 처방을 만들 수 없습니다.";
-    return { plan: { version: PLAN_VERSION, generatedAt, runId, items: [], note }, costUsd: 0 };
+    return { plan: { version: PLAN_VERSION, generatedAt, runId, items: [], note, locationCheck }, costUsd: 0 };
   }
 
   let costUsd = 0;
@@ -361,7 +369,7 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
     })
   );
 
-  return { plan: { version: PLAN_VERSION, generatedAt, runId, items, note: null }, costUsd };
+  return { plan: { version: PLAN_VERSION, generatedAt, runId, items, note: null, locationCheck }, costUsd };
 }
 
 /**

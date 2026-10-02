@@ -43,6 +43,8 @@ type Item = {
   address?: string;
   roadAddress?: string;
   category?: string;
+  mapx?: string;
+  mapy?: string;
 };
 
 class SearchError extends Error {
@@ -129,6 +131,34 @@ function domainOf(url: string | null | undefined): string | null {
     .split(/[/?#]/)[0]
     .toLowerCase();
   return domain || null;
+}
+
+export type Place = {
+  title: string;
+  /** 지번 주소 (법정동이 들어 있다) */
+  address: string;
+  roadAddress: string;
+  category: string;
+  lat: number | null;
+  lng: number | null;
+};
+
+/** 네이버 지역 검색 결과를 좌표와 함께. 좌표는 경위도(× 10^7)로 올 때만 쓴다 */
+export async function searchPlaces(query: string, display = 5): Promise<Place[]> {
+  const items = await search("local", query, display);
+  return items.map((i) => {
+    const x = Number(i.mapx);
+    const y = Number(i.mapy);
+    const wgs84 = x > 1e8 && y > 1e7;
+    return {
+      title: plain(i.title),
+      address: plain(i.address),
+      roadAddress: plain(i.roadAddress),
+      category: plain(i.category),
+      lat: wgs84 ? y / 1e7 : null,
+      lng: wgs84 ? x / 1e7 : null,
+    };
+  });
 }
 
 /** 조회하지 못한 검색은 total을 -1로 남긴다(결과 0건과 구별하기 위해) */

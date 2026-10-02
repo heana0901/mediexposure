@@ -46,7 +46,7 @@ function pct(n: number | null) {
  * - renderReportEmail: 메일 본문. PDF를 첨부하면 요약만, 첨부하지 못하면 전체를 본문에 싣는다.
  */
 function buildReport(data: ClientReportData) {
-  const { client, providers, selfExposure, competitorTop5, unexposedCount, weeklyTrend, metrics, method, demand, questions, contentPlan, siteAudit } =
+  const { client, providers, selfExposure, competitorTop5, unexposedCount, weeklyTrend, metrics, method, demand, questions, contentPlan, siteAudit, locationCheck } =
     data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const selfMargin = marginOfError(selfExposure.count, selfExposure.total);
@@ -240,6 +240,47 @@ function buildReport(data: ClientReportData) {
     </div>`
     : "";
 
+  const VERDICT = {
+    wrong: { label: "틀림", color: "#dc2626" },
+    unsure: { label: "확인 필요", color: "#d97706" },
+    correct: { label: "맞음", color: "#059669" },
+  } as const;
+  const locationSection =
+    locationCheck && locationCheck.claims.length
+      ? `
+    <div class="keep" style="margin-bottom:24px;">
+      ${sectionTitle("AI가 잘못 알고 있는 우리 병원 정보", "최근 3회 실행에서 AI가 우리 병원 이름 옆에 붙인 위치를 네이버 플레이스의 실제 위치와 견줬습니다.")}
+      ${locationCheck.actual ? `<div style="font-size:12.5px;color:${INK};margin-bottom:6px;">실제 위치: <b>${esc([locationCheck.actual.gu, locationCheck.actual.dong].filter(Boolean).join(" "))}</b> <span style="color:${MUTED};">(${esc(locationCheck.actual.roadAddress)})</span></div>` : ""}
+      <div style="font-size:13px;color:${locationCheck.wrong ? "#dc2626" : "#059669"};font-weight:600;margin-bottom:8px;">${
+        locationCheck.wrong
+          ? `위치를 말한 AI 답변 ${locationCheck.mentions}개 중 ${locationCheck.wrong}개가 틀린 위치를 말했습니다.`
+          : `위치를 말한 AI 답변 ${locationCheck.mentions}개에서 틀린 위치는 찾지 못했습니다.`
+      }</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};">AI가 말한 위치</td>
+          <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};">판정</td>
+          <td style="padding:0 5px 8px;font-size:11px;color:${MUTED};text-align:right;">답변 수</td>
+        </tr>
+        ${locationCheck.claims
+          .map(
+            (c) => `
+        <tr>
+          <td style="${cell}color:${INK};">${esc(c.text)}<div style="font-size:11px;color:${MUTED};margin-top:2px;">${esc(c.providers.join("·"))}${c.example.question ? ` · 질문: ${esc(c.example.question)}` : ""}</div></td>
+          <td style="${cell}"><b style="color:${VERDICT[c.verdict].color};">${VERDICT[c.verdict].label}</b><div style="font-size:11px;color:${MUTED};margin-top:2px;">${esc(c.reason)}</div></td>
+          <td style="${cell}text-align:right;color:${INK};">${c.count}</td>
+        </tr>`
+          )
+          .join("")}
+      </table>
+      ${
+        locationCheck.wrong
+          ? `<div style="font-size:12px;color:#4b5563;line-height:1.6;margin-top:10px;"><b style="color:${INK};">바로잡는 법</b><br />· 홈페이지 모든 페이지 하단에 주소를 이미지가 아닌 글자로 넣고, 가까운 역·동네를 함께 적습니다 (예: "${esc(locationCheck.actual?.dong ?? "OO동")} · OO역 도보 N분")<br />· 병원 구조화 데이터(MedicalClinic)에 주소와 좌표를 넣습니다<br />· 네이버 플레이스·구글 비즈니스 프로필·블로그의 주소 표기를 똑같이 맞춥니다</div>`
+          : ""
+      }
+    </div>`
+      : "";
+
   const trendSection = weeklyTrend.length
     ? `
     <div class="keep" style="margin-bottom:24px;">
@@ -274,7 +315,7 @@ function buildReport(data: ClientReportData) {
 
   const full = [
     header,
-    has("exposure") ? summaryCards + questionSection : "",
+    has("exposure") ? summaryCards + locationSection + questionSection : "",
     has("trends") ? trendSection : "",
     has("competitors") ? competitorSection + planSection : "",
     has("site") ? auditSection : "",
@@ -285,6 +326,9 @@ function buildReport(data: ClientReportData) {
   const summary = [
     header,
     has("exposure") ? summaryCards : "",
+    has("exposure") && locationCheck?.wrong
+      ? `<div style="border:1px solid #fecaca;background:#fef2f2;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#b91c1c;">⚠ AI 답변 ${locationCheck.wrong}개가 우리 병원 위치를 틀리게 말했습니다 (예: ${esc(locationCheck.claims[0].text)}). 자세한 내용은 첨부 PDF에 있습니다.</div>`
+      : "",
     `<div style="border:1px solid ${LINE};border-radius:10px;padding:16px;margin-bottom:24px;font-size:13px;color:${INK};line-height:1.7;">
       <b>첨부한 PDF 리포트</b>에 아래 내용이 들어 있습니다.<br />
       ${included.map((section) => `· <b>${section.label}</b> <span style="color:${MUTED};">${section.detail}</span>`).join("<br />")}

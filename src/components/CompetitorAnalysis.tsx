@@ -259,6 +259,13 @@ function ContentPlanCard({ clientId }: { clientId: string }) {
         <div className="text-sm text-gray-400 py-4 text-center">{plan?.note ?? "아직 측정 결과가 없습니다."}</div>
       ) : (
         <>
+          {plan.locationCheck && plan.locationCheck.wrong > 0 && (
+            <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">
+              ⚠ AI 답변 {plan.locationCheck.wrong}개가 우리 병원 위치를 틀리게 말했어요 (예: {plan.locationCheck.claims[0]?.text}).
+              {plan.locationCheck.actual?.dong && <> 실제: {plan.locationCheck.actual.dong}.</>} 자세한 내용과 바로잡는 법은 리포트에
+              들어갑니다.
+            </div>
+          )}
           <ol className="space-y-3">
             {plan.items.map((item, i) => (
               <li key={item.keywordId} className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">

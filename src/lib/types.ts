@@ -194,9 +194,35 @@ export type ContentPrescription = {
   cautions: string[];
 };
 
+/** AI가 말한 우리 병원 위치 하나 (같은 표현은 묶어서 센다) */
+export type LocationClaim = {
+  /** AI가 말한 위치 표현. 예: "단원구 선부동 / 선부역 인근" */
+  text: string;
+  verdict: "correct" | "wrong" | "unsure";
+  /** 판정 근거. 예: "선부역은 실제 위치에서 2.4km" */
+  reason: string;
+  /** 이 표현을 쓴 답변 수 */
+  count: number;
+  providers: string[];
+  example: { quote: string; question: string | null };
+};
+
+/** AI가 잘못 알고 있는 우리 병원 정보 (지금은 위치) */
+export type LocationCheck = {
+  /** 네이버 플레이스로 확인한 실제 위치. 확인하지 못했으면 null */
+  actual: { address: string; roadAddress: string; gu: string | null; dong: string | null } | null;
+  /** 우리 병원 위치를 말한 답변 수 */
+  mentions: number;
+  /** 틀린 위치를 말한 답변 수 */
+  wrong: number;
+  claims: LocationClaim[];
+};
+
 export type ContentPlan = {
   /** 처방을 만든 방식의 버전 (바뀌면 저장된 처방을 새로 만든다) */
   version?: number;
+  /** AI가 잘못 알고 있는 우리 병원 위치 */
+  locationCheck?: LocationCheck | null;
   generatedAt: string;
   /** 이 처방의 근거가 된 가장 최근 실행 */
   runId: string | null;
