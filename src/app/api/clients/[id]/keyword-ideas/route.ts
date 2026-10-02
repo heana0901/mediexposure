@@ -55,9 +55,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "찾을 키워드를 입력하세요." }, { status: 400 });
   }
 
+  // 키워드 도구는 글자보다 광고 업종 기준으로 연관어를 묶어서, '안산허리'만 넣으면 '허리'가 든 키워드가
+  // 거의 안 나온다. 입력한 단어 하나하나('안산', '허리')로도 물어 후보를 넓힌 뒤 아래에서 걸러 낸다.
+  const hints = seedParam
+    ? [...new Set([...seeds, ...seeds.flatMap((s) => s.split(/[\s,]+/)).filter((t) => t.trim().length >= 2)])]
+    : seeds;
+
   let stats;
   try {
-    stats = await fetchKeywordStats(seeds);
+    stats = await fetchKeywordStats(hints);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
   }
