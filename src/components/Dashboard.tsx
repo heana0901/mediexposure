@@ -12,6 +12,8 @@ import type {
   UsageSummary,
   SelfExposure,
   VisibilityMetrics,
+  DemandSummary,
+  NaverResult,
   CompetitorFrequencyEntry,
   SourceFrequencyEntry,
   ResultWithKeyword,
@@ -46,6 +48,7 @@ export function Dashboard() {
   const [runs, setRuns] = useState<MonitoringRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [results, setResults] = useState<ResultWithKeyword[]>([]);
+  const [naverResults, setNaverResults] = useState<NaverResult[]>([]);
   const [tab, setTab] = useState<Tab>("status");
   const [isRunning, setIsRunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -63,6 +66,7 @@ export function Dashboard() {
     totalResults: number;
     selfExposure: SelfExposure;
     metrics?: VisibilityMetrics;
+    demand?: DemandSummary;
   }>({
     unexposed: [],
     competitorFrequency: [],
@@ -89,6 +93,7 @@ export function Dashboard() {
   if (selectedClientId !== resetKey) {
     setResetKey(selectedClientId);
     setResults([]);
+    setNaverResults([]);
     setSelectedRunId(null);
   }
 
@@ -109,7 +114,10 @@ export function Dashboard() {
     if (!selectedRunId) return;
     api
       .getRun(selectedRunId)
-      .then((data) => setResults(data.results))
+      .then((data) => {
+        setResults(data.results);
+        setNaverResults(data.naver ?? []);
+      })
       .catch((e) => setError(e.message));
   }, [selectedRunId]);
 
@@ -203,8 +211,11 @@ export function Dashboard() {
         keywords: { text: (r.keyword_id ? keywordMap.get(r.keyword_id)?.text : null) ?? r.keyword_text ?? "" },
       }));
       setResults(withKeyword);
+      setNaverResults([]);
       setRuns((prev) => [data.run, ...prev]);
       setSelectedRunId(data.run.id);
+      // 실행하면서 채운 대표 검색어·검색량을 질문 목록에도 반영
+      api.listKeywords(selectedClientId).then(setKeywords).catch(() => {});
       // 일부 제공자만 실패한 경우: 결과는 저장하되 무엇이 빠졌는지 반드시 알려야 합니다.
       setRunWarnings(data.warnings ?? []);
     } catch (e) {
@@ -377,6 +388,7 @@ export function Dashboard() {
               {tab === "status" && (
                 <>
                   <KeywordManager
+                    clientId={selectedClientId}
                     keywords={keywords}
                     onAddKeyword={handleAddKeyword}
                     onAddKeywordsBulk={handleAddKeywordsBulk}
@@ -385,6 +397,7 @@ export function Dashboard() {
                   <ExposureStatus
                     clientName={selectedClient?.name ?? ""}
                     clientAliases={selectedClient?.aliases ?? []}
+                    naverResults={naverResults}
                     clientType={selectedClient?.client_type ?? "hospital"}
                     results={results}
                     runs={runs}
@@ -405,6 +418,7 @@ export function Dashboard() {
                   totalResults={competitorData.totalResults}
                   selfExposure={competitorData.selfExposure}
                   metrics={competitorData.metrics}
+                  demand={competitorData.demand}
                 />
               )}
 

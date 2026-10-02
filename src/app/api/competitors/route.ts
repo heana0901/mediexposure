@@ -12,6 +12,8 @@ import {
 import { fetchAllPages, fetchClientResults } from "@/lib/clientResults";
 import { verifyHospitals } from "@/lib/hospitalRegistry";
 import { nameKey } from "@/lib/nameMatch";
+import { selectActiveKeywords } from "@/lib/keywords";
+import { demandSummary, ensureSearchKeywords, refreshSearchVolumes } from "@/lib/naver/demand";
 import type { ResultWithKeyword } from "@/lib/types";
 
 /** 실존 확인은 화면에 보이는 상위 병원만 한다 */
@@ -39,8 +41,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 
+  // 검색 수요: 검색어·검색량이 아직 없는 질문만 채운다(키가 없으면 검색량은 건너뜀)
+  const { data: activeKeywords } = await selectActiveKeywords(supabase, clientId);
+  const keywordRows = (activeKeywords ?? []) as Parameters<typeof demandSummary>[0];
+  try {
+    await ensureSearchKeywords(supabase, keywordRows);
+    await refreshSearchVolumes(supabase, keywordRows);
+  } catch (err) {
+    console.error("[competitors] 검색 수요 갱신 실패", err);
+  }
+  const demand = demandSummary(keywordRows, allResults);
+
   if (allResults.length === 0) {
     return NextResponse.json({
+      demand,
       unexposed: [],
       competitorFrequency: [],
       sourceFrequency: [],
@@ -90,5 +104,6 @@ export async function GET(request: Request) {
     totalResults: allResults.length,
     selfExposure: selfExposure(allResults),
     metrics: visibilityMetrics(allResults, client?.website_url),
+    demand,
   });
 }

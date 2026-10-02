@@ -13,6 +13,8 @@ import { fetchAllPages, fetchClientResults } from "./clientResults";
 import { isProvider, PROVIDER_META, providersIn, type Provider } from "./providers";
 import type { CompetitorFrequencyEntry, ResultWithKeyword, SelfExposure, VisibilityMetrics } from "./types";
 import { keywordTextOf } from "./types";
+import { selectActiveKeywords } from "./keywords";
+import { demandSummary } from "./naver/demand";
 
 export type ClientReportData = {
   client: {
@@ -32,6 +34,8 @@ export type ClientReportData = {
   unexposedCount: number;
   weeklyTrend: { createdAt: string; rates: Partial<Record<Provider, number>>; overallRate: number | null }[];
   metrics: VisibilityMetrics;
+  /** 검색 수요(네이버 월간 검색량) 반영 AI 추천 확률. 검색량을 모르면 null */
+  demand: { weightedRate: number; totalVolume: number } | null;
   /** 리포트 하단에 적는 측정 방법 한 줄 (최근 실행 기준) */
   method: string | null;
 };
@@ -63,6 +67,7 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
       unexposedCount: 0,
       weeklyTrend: [],
       metrics: visibilityMetrics([], client.website_url),
+      demand: null,
       method: null,
     };
   }
@@ -125,8 +130,15 @@ export async function getClientReportData(clientId: string): Promise<ClientRepor
     method = `측정 방법: ${[...models].map(([p, m]) => `${p}(${m})`).join(" · ")}에 ${mode} 질문을 ${samples}회씩 묻고, 답변 원문에 병원 이름이 실제로 있을 때만 노출로 집계했습니다.`;
   }
 
+  const { data: activeKeywords } = await selectActiveKeywords(supabase, clientId);
+  const demandData = demandSummary((activeKeywords ?? []) as Parameters<typeof demandSummary>[0], allResults);
+
   return {
     client,
+    demand:
+      demandData.weightedRate === null
+        ? null
+        : { weightedRate: demandData.weightedRate, totalVolume: demandData.totalVolume },
     providers: providersIn(allResults),
     selfExposure: tallySelf(allResults),
     competitorTop5: competitorFrequency(allResults, { name: client.name, aliases }).slice(0, 5),

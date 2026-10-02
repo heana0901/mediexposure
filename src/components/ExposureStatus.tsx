@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ClientType, MonitoringRun, ResultWithKeyword } from "@/lib/types";
+import type { ClientType, MonitoringRun, NaverResult, ResultWithKeyword } from "@/lib/types";
 import { keywordTextOf } from "@/lib/types";
 import { PROVIDER_META, providersIn, type Provider } from "@/lib/providers";
 import { clientNameVariants } from "@/lib/nameMatch";
@@ -12,6 +12,7 @@ import { IconEye, IconLink } from "./icons";
 type Props = {
   clientName: string;
   clientAliases?: string[];
+  naverResults?: NaverResult[];
   clientType: ClientType;
   results: ResultWithKeyword[];
   runs: MonitoringRun[];
@@ -105,16 +106,83 @@ function ProviderTile({
   );
 }
 
+function rankLabel(rank: number | null, total: number) {
+  if (total === 0) return "결과 없음";
+  return rank ? `${rank}위` : `상위 ${total}개 중 없음`;
+}
+
+/** 같은 질문(대표 검색어)으로 본 네이버 노출 한 줄 요약 */
+function NaverLine({ naver }: { naver: NaverResult }) {
+  const [open, setOpen] = useState(false);
+  const blog =
+    naver.blog_total === 0
+      ? "결과 없음"
+      : naver.blog_rank
+        ? `우리 블로그 ${naver.blog_rank}위`
+        : `상위 ${naver.blog_total}개 중 우리 블로그 없음`;
+  return (
+    <div className="px-4 py-2 border-b border-gray-100 bg-emerald-50/40 text-xs text-gray-600">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-medium text-emerald-700">네이버 「{naver.search_keyword}」</span>
+        <span>플레이스 {rankLabel(naver.local_rank, naver.local_total)}</span>
+        <span>
+          블로그 {blog}
+          {naver.blog_mention_count > 0 && ` · 병원 이름 언급 ${naver.blog_mention_count}건`}
+        </span>
+        <span>웹문서 {rankLabel(naver.web_rank, naver.web_total)}</span>
+        <button className="text-emerald-700 hover:underline ml-auto" onClick={() => setOpen((v) => !v)}>
+          {open ? "접기" : "상위 결과 보기"}
+        </button>
+      </div>
+      {open && (
+        <div className="grid sm:grid-cols-2 gap-3 mt-2">
+          <div>
+            <div className="text-[11px] text-gray-400 mb-1">플레이스 상위</div>
+            <ol className="space-y-0.5">
+              {naver.top_local.map((l, i) => (
+                <li key={i} className={l.ours ? "text-blue-700 font-semibold" : ""}>
+                  {i + 1}. {l.title} <span className="text-gray-400">{l.address}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div>
+            <div className="text-[11px] text-gray-400 mb-1">블로그 상위</div>
+            <ol className="space-y-0.5">
+              {naver.top_blogs.map((b, i) => (
+                <li key={i} className="truncate">
+                  {i + 1}.{" "}
+                  <a
+                    href={b.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={b.own ? "text-blue-700 font-semibold" : b.mentions ? "text-emerald-700" : "hover:underline"}
+                  >
+                    {b.title}
+                  </a>{" "}
+                  <span className="text-gray-400">{b.blogger}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KeywordCard({
   nameVariants,
   clientType,
   keywordText,
   results,
+  naver,
 }: {
   nameVariants: string[];
   clientType: ClientType;
   keywordText: string;
   results: ResultWithKeyword[];
+  naver?: NaverResult;
 }) {
   const competitorLabel = clientType === "hospital" ? "경쟁 병원" : "경쟁 업체";
   const providers = providersIn(results);
@@ -146,6 +214,8 @@ function KeywordCard({
           {margin !== null && <span className="text-gray-400"> ±{margin}%p</span>} ({mentionedCount}/{results.length}회)
         </span>
       </div>
+
+      {naver && <NaverLine naver={naver} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
         {providers.map((provider) => (
@@ -238,6 +308,7 @@ function KeywordCard({
 export function ExposureStatus({
   clientName,
   clientAliases = [],
+  naverResults = [],
   clientType,
   results,
   runs,
@@ -280,6 +351,7 @@ export function ExposureStatus({
             clientType={clientType}
             keywordText={keywordTextOf(group[0])}
             results={group}
+            naver={naverResults.find((n) => n.keyword_id && n.keyword_id === group[0].keyword_id)}
           />
         ))
       )}

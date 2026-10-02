@@ -31,5 +31,8 @@ export async function GET(
     return NextResponse.json({ error: resultsError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ run, results });
+  // 017 전이면 표가 없으므로 빈 목록
+  const { data: naver } = await supabase.from("naver_results").select("*").eq("run_id", id);
+
+  return NextResponse.json({ run, results, naver: naver ?? [] });
 }

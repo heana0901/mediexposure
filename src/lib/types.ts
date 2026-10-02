@@ -18,6 +18,8 @@ export type Client = {
   auto_report_day: number | null;
   /** AI가 우리 병원을 부를 수 있는 다른 이름(약칭·영문명·지점명). 016 이전 데이터엔 없다 */
   aliases?: string[];
+  /** 병원 네이버 블로그 주소 (017) */
+  naver_blog_url?: string | null;
   created_at: string;
 };
 
@@ -31,6 +33,7 @@ export type ClientInput = {
   contact_email?: string;
   website_url?: string;
   aliases?: string[];
+  naver_blog_url?: string;
 };
 
 export type Keyword = {
@@ -41,6 +44,10 @@ export type Keyword = {
   variants?: string[];
   /** 지명이 여러 지역에 있을 때의 경고 */
   variant_note?: string | null;
+  /** 네이버 대표 검색어와 월간 검색량 (017) */
+  search_keyword?: string | null;
+  search_volume?: number | null;
+  search_volume_note?: string | null;
   created_at: string;
 };
 
@@ -174,4 +181,54 @@ export type SiteAuditHistoryEntry = {
   passed: number;
   total: number;
   checks: { id: string; name: string; status: "pass" | "warn" | "fail"; axis: "seo" | "aeo" | "geo" | "naver" }[];
+};
+
+/** 검색 수요(네이버 월간 검색량)를 반영한 AI 추천 확률 */
+export type DemandSummary = {
+  /** 네이버 검색광고 API 키가 설정돼 있는지 */
+  configured: boolean;
+  /** 검색량 가중 AI 추천 확률(%). 검색량을 아는 질문이 없으면 null */
+  weightedRate: number | null;
+  totalVolume: number;
+  items: {
+    keywordId: string;
+    text: string;
+    searchKeyword: string | null;
+    volume: number | null;
+    volumeNote: string | null;
+    hits: number;
+    total: number;
+    rate: number | null;
+  }[];
+};
+
+/** 질문 추천: 네이버 연관 키워드 */
+export type KeywordIdea = {
+  keyword: string;
+  volume: number;
+  approx: boolean;
+  competition: string | null;
+  /** 우리 병원 이름이 들어간 검색어 */
+  brand: boolean;
+  /** 경쟁 병원 이름이 들어간 검색어 */
+  competitorBrand: string | null;
+};
+
+/** 한 번의 실행에서 같은 질문으로 본 네이버 노출 */
+export type NaverResult = {
+  id: string;
+  run_id: string;
+  keyword_id: string | null;
+  search_keyword: string;
+  local_rank: number | null;
+  local_total: number;
+  blog_rank: number | null;
+  blog_own_count: number;
+  blog_mention_count: number;
+  blog_total: number;
+  web_rank: number | null;
+  web_total: number;
+  top_local: { title: string; address: string; ours: boolean }[];
+  top_blogs: { title: string; link: string; blogger: string; own: boolean; mentions: boolean }[];
+  created_at: string;
 };

@@ -10,6 +10,7 @@ import type {
   ResultWithKeyword,
   VisibilityMetrics,
   ExposureTally,
+  DemandSummary,
 } from "@/lib/types";
 import { marginOfError, MIN_RELIABLE_SAMPLES, percent } from "@/lib/stats";
 import { keywordTextOf } from "@/lib/types";
@@ -42,7 +43,90 @@ type Props = {
   totalResults: number;
   selfExposure: SelfExposure;
   metrics?: VisibilityMetrics;
+  demand?: DemandSummary;
 };
+
+/** 검색 수요(네이버 월간 검색량)를 반영한 AI 추천 확률과 질문별 표 */
+function DemandCard({ demand, clientName }: { demand: DemandSummary; clientName: string }) {
+  const known = demand.items.filter((i) => i.volume !== null);
+  return (
+    <div className="border border-gray-100 rounded-xl bg-white shadow-sm p-4 mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <div className="text-sm font-medium text-gray-700">검색 수요 반영 AI 추천 확률</div>
+          <p className="text-xs text-gray-400 mt-1">
+            네이버 월간 검색량으로 질문마다 가중치를 줬습니다. 사람들이 많이 찾는 질문에서 {clientName}이(가) 얼마나
+            추천되는지를 뜻합니다.
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-semibold text-blue-600">
+            {demand.weightedRate === null ? "-" : `${demand.weightedRate}%`}
+          </div>
+          <div className="text-[11px] text-gray-400">질문 합계 월 {demand.totalVolume.toLocaleString()}회 검색</div>
+        </div>
+      </div>
+
+      {!demand.configured && known.length === 0 ? (
+        <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+          네이버 검색광고 API 키(NAVER_AD_API_KEY · NAVER_AD_SECRET_KEY · NAVER_AD_CUSTOMER_ID)를 Vercel 환경변수에
+          넣으면 질문별 검색량이 표시됩니다.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-400 border-b border-gray-100">
+                <th className="text-left font-normal py-1.5">질문 (대표 검색어)</th>
+                <th className="text-right font-normal py-1.5 px-2 whitespace-nowrap">월 검색량</th>
+                <th className="text-right font-normal py-1.5 whitespace-nowrap">AI 추천 확률</th>
+              </tr>
+            </thead>
+            <tbody>
+              {demand.items.map((i) => {
+                const big = (i.volume ?? 0) >= 100;
+                const weak = i.rate !== null && i.rate < 30;
+                return (
+                  <tr key={i.keywordId} className="border-b border-gray-50">
+                    <td className="py-1.5 pr-2">
+                      <span className="text-gray-800">{i.text}</span>
+                      {i.searchKeyword && i.searchKeyword !== i.text && (
+                        <span className="text-gray-400"> ({i.searchKeyword})</span>
+                      )}
+                      {big && weak && (
+                        <span className="ml-1.5 text-[10px] text-red-600 bg-red-50 rounded px-1.5 py-0.5">
+                          수요 큼 · 추천 약함
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right py-1.5 px-2 whitespace-nowrap text-gray-700">
+                      {i.volume === null ? (
+                        <span className="text-gray-300">-</span>
+                      ) : i.volumeNote ? (
+                        <span className="text-gray-400">{i.volumeNote}</span>
+                      ) : (
+                        i.volume.toLocaleString()
+                      )}
+                    </td>
+                    <td className="text-right py-1.5 whitespace-nowrap">
+                      {i.rate === null ? (
+                        <span className="text-gray-300">측정 전</span>
+                      ) : (
+                        <span className={weak ? "text-red-500" : "text-gray-800"}>
+                          {i.rate}% <span className="text-gray-400">({i.hits}/{i.total})</span>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** "33% ±5%p" — 표본이 적으면 오차범위 대신 '표본 부족'을 붙인다 */
 function RateWithMargin({ tally, className = "" }: { tally: ExposureTally; className?: string }) {
@@ -198,6 +282,7 @@ export function CompetitorAnalysis({
   totalResults,
   selfExposure,
   metrics,
+  demand,
 }: Props) {
   const [subTab, setSubTab] = useState<SubTab>("frequency");
   const competitorLabel = clientType === "hospital" ? "경쟁병원" : "경쟁업체";
@@ -237,6 +322,8 @@ export function CompetitorAnalysis({
           </button>
         ))}
       </div>
+
+      {subTab === "frequency" && demand && <DemandCard demand={demand} clientName={clientName} />}
 
       {subTab === "frequency" && metrics && (
         <div className="grid sm:grid-cols-3 gap-4 mb-6">

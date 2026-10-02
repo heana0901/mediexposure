@@ -7,9 +7,15 @@ import { PROVIDER_META, isProvider, type Provider } from "@/lib/providers";
 import type { TrendPoint } from "@/lib/types";
 
 type RunRow = { id: string; created_at: string; query_mode?: string | null; samples?: number | null };
-type ResultRow = { run_id: string; provider: string; mentioned: boolean; model: string | null; sample_index: number | null };
+type ResultRow = {
+  run_id: string;
+  keyword_id: string | null;
+  provider: string;
+  mentioned: boolean;
+  model: string | null;
+};
 
-const MODE_LABEL: Record<string, string> = { natural: "자연 질문", list: "형식 지시" };
+const MODE_LABEL: Record<string, string> = { natural: "자연 질문", list: "형식 지시", unknown: "질문 방식 기록 전" };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -43,7 +49,7 @@ export async function GET(request: Request) {
     results = await fetchClientResults<ResultRow>(
       supabase,
       clientId,
-      "id, run_id, provider, mentioned, model, sample_index, created_at"
+      "id, run_id, keyword_id, provider, mentioned, model, created_at"
     );
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
@@ -67,8 +73,14 @@ export async function GET(request: Request) {
     const runResults = resultsByRun.get(run.id) ?? [];
     const tally = selfExposure(runResults);
 
-    const mode = run.query_mode ?? "list";
-    const samples = run.samples ?? Math.max(1, ...runResults.map((r) => (r.sample_index ?? 0) + 1));
+    // 016 이전 실행은 질문 방식이 기록되지 않았다. 반복 횟수는 질문·AI별 답변 수로 알 수 있다.
+    const mode = run.query_mode ?? "unknown";
+    const perQuestion = new Map<string, number>();
+    for (const r of runResults) {
+      const key = `${r.keyword_id}|${r.provider}`;
+      perQuestion.set(key, (perQuestion.get(key) ?? 0) + 1);
+    }
+    const samples = run.samples ?? Math.max(1, ...perQuestion.values());
     const models = new Map<Provider, string>();
     for (const r of runResults) if (isProvider(r.provider) && r.model) models.set(r.provider, r.model);
 

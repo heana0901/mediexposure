@@ -13,6 +13,9 @@ import type {
   AppUser,
   AppUserInput,
   SiteAuditHistoryEntry,
+  DemandSummary,
+  KeywordIdea,
+  NaverResult,
 } from "./types";
 import type { ClientReportData } from "./reportData";
 import type { SiteComparisonResult } from "./diagnose-shared";
@@ -89,6 +92,7 @@ export const api = {
       json<{
         run: MonitoringRun;
         results: (MonitoringResult & { keywords: { text: string } })[];
+        naver?: NaverResult[];
       }>(r)
     ),
 
@@ -101,6 +105,7 @@ export const api = {
         totalResults: number;
         selfExposure: SelfExposure;
         metrics: VisibilityMetrics;
+        demand?: DemandSummary;
       }>(r)
     ),
 
@@ -160,6 +165,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ urls, clientId }),
     }).then((r) => json<SiteComparisonResult>(r)),
+
+  getKeywordIdeas: (clientId: string, seeds?: string) =>
+    fetch(
+      `/api/clients/${clientId}/keyword-ideas${seeds ? `?seeds=${encodeURIComponent(seeds)}` : ""}`
+    ).then((r) => json<{ seeds: string[]; ideas: KeywordIdea[] }>(r)),
 
   getSiteAuditHistory: (clientId: string) =>
     fetch(`/api/site-audit/history?clientId=${clientId}`).then((r) => json<SiteAuditHistoryEntry[]>(r)),

@@ -3,12 +3,20 @@ import { getSupabaseServerClient } from "@/lib/supabase";
 import { assertClientAccess } from "@/lib/dal";
 import { selectActiveKeywords } from "@/lib/keywords";
 import { ensureVariants } from "@/lib/keywordVariants";
+import { ensureSearchKeywords, refreshSearchVolumes } from "@/lib/naver/demand";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** 새 질문에 같은 의도의 다른 표현을 만들어 붙인 뒤, 저장된 행을 다시 읽어 돌려준다 */
 async function withVariants(supabase: SupabaseClient, clientId: string, rows: { id: string; text: string; variants?: unknown }[]) {
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).maybeSingle();
   await ensureVariants(supabase, rows, client ?? {});
+  const { data: fresh } = await supabase.from("keywords").select("*").in("id", rows.map((r) => r.id));
+  try {
+    await ensureSearchKeywords(supabase, fresh ?? []);
+    await refreshSearchVolumes(supabase, fresh ?? []);
+  } catch (err) {
+    console.error("[keywords] 검색량 조회 실패", err);
+  }
   const { data } = await supabase.from("keywords").select("*").in("id", rows.map((r) => r.id));
   const byId = new Map((data ?? []).map((r) => [r.id, r]));
   return rows.map((r) => byId.get(r.id) ?? r);

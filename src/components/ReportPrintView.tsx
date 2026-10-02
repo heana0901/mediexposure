@@ -22,7 +22,7 @@ type Props = {
 };
 
 export function ReportPrintView({ data }: Props) {
-  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend, metrics, method } =
+  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend, metrics, method, demand } =
     data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const selfMargin = marginOfError(selfExposure.count, selfExposure.total);
@@ -84,6 +84,11 @@ export function ReportPrintView({ data }: Props) {
             점유율 {pctOf(metrics.shareOfVoice)} · 1순위 추천 {pctOf(metrics.firstPlace)} · 홈페이지 인용{" "}
             {pctOf(metrics.ownCitation)}
           </div>
+          {demand && (
+            <div style={{ fontSize: 12, color: "#2563eb", marginTop: 4 }}>
+              네이버 검색 수요 반영 {demand.weightedRate}% (질문 합계 월 {demand.totalVolume.toLocaleString()}회 검색)
+            </div>
+          )}
         </div>
         <div style={{ flex: 1, border: "1px solid #e8ebef", borderRadius: 10, padding: 16 }}>
           <div style={{ fontSize: 12, color: "#8b95a3", marginBottom: 6 }}>미노출 키워드 (최근 3회 실행)</div>

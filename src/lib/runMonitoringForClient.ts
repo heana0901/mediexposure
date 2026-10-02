@@ -9,6 +9,7 @@ import { describeAiError } from "./aiError";
 import { selectActiveKeywords } from "./keywords";
 import { ensureVariants } from "./keywordVariants";
 import { judgeResponse } from "./nameMatch";
+import { recordNaver } from "./naver/record";
 import { PROVIDER_META, type Provider } from "./providers";
 
 /**
@@ -129,6 +130,8 @@ type ClientForMonitoring = {
   region?: string | null;
   department?: string | null;
   aliases?: unknown;
+  website_url?: string | null;
+  naver_blog_url?: string | null;
 };
 
 function aliasesOf(client: ClientForMonitoring): string[] {
@@ -321,6 +324,9 @@ export async function runMonitoringForClient(
     await supabase.from("monitoring_runs").delete().eq("id", run.id);
     throw new Error(attempt.error.message);
   }
+
+  // 같은 질문으로 네이버 쪽(검색량·플레이스·블로그·웹문서)도 함께 기록한다
+  warnings.push(...(await recordNaver(supabase, run.id, keywords, client)));
 
   return { run, results: attempt.data, keywords, providers, samples, queryMode, warnings };
 }

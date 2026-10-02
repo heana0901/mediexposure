@@ -24,7 +24,7 @@ function pct(n: number | null) {
 }
 
 export function renderReportEmail(data: ClientReportData): { subject: string; html: string } {
-  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend, metrics, method } =
+  const { client, providers, selfExposure, competitorTop5, unexposedRecent, unexposedCount, weeklyTrend, metrics, method, demand } =
     data;
   const selfRate = selfExposure.total === 0 ? 0 : Math.round((selfExposure.count / selfExposure.total) * 100);
   const selfMargin = marginOfError(selfExposure.count, selfExposure.total);
@@ -113,6 +113,7 @@ export function renderReportEmail(data: ClientReportData): { subject: string; ht
               .join(" · ")}
           </div>
           <div style="font-size:12px;color:${MUTED};margin-top:6px;">점유율 ${pctOf(metrics.shareOfVoice)} · 1순위 추천 ${pctOf(metrics.firstPlace)} · 홈페이지 인용 ${pctOf(metrics.ownCitation)}</div>
+          ${demand ? `<div style="font-size:12px;color:#2563eb;margin-top:4px;">네이버 검색 수요 반영 ${demand.weightedRate}% (질문 합계 월 ${demand.totalVolume.toLocaleString()}회 검색)</div>` : ""}
         </td>
         <td width="4%"></td>
         <td style="border:1px solid ${LINE};border-radius:10px;padding:16px;" width="48%">

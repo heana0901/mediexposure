@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   if (!session.isAdmin) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
 
-  const { name, client_type, region, department, director_name, is_specialist, contact_email, website_url, aliases } =
+  const { name, client_type, region, department, director_name, is_specialist, contact_email, website_url, aliases, naver_blog_url } =
     await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "이름을 입력하세요." }, { status: 400 });
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("clients")
     .insert({
+      ...(typeof naver_blog_url === "string" ? { naver_blog_url: naver_blog_url.trim() || null } : {}),
       ...(parsedAliases?.length ? { aliases: parsedAliases } : {}),
       name: name.trim(),
       client_type: client_type === "business" ? "business" : "hospital",

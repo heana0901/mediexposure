@@ -12,7 +12,7 @@ export async function PATCH(
   const access = await assertClientAccess(id);
   if (!access.ok) return NextResponse.json({ error: "권한이 없습니다." }, { status: access.status });
 
-  const { name, client_type, region, department, director_name, is_specialist, contact_email, website_url, aliases } =
+  const { name, client_type, region, department, director_name, is_specialist, contact_email, website_url, aliases, naver_blog_url } =
     await request.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "이름을 입력하세요." }, { status: 400 });
@@ -26,6 +26,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("clients")
     .update({
+      ...(typeof naver_blog_url === "string" ? { naver_blog_url: naver_blog_url.trim() || null } : {}),
       ...(parsedAliases !== undefined ? { aliases: parsedAliases } : {}),
       name: name.trim(),
       client_type: client_type === "business" ? "business" : "hospital",

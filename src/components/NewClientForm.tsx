@@ -50,6 +50,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
   const [contactEmail, setContactEmail] = useState(client?.contact_email ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(client?.website_url ?? "");
   const [aliases, setAliases] = useState((client?.aliases ?? []).join(", "));
+  const [naverBlogUrl, setNaverBlogUrl] = useState(client?.naver_blog_url ?? "");
   const [saving, setSaving] = useState(false);
 
   const labels = TYPE_LABELS[clientType];
@@ -67,6 +68,7 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
         is_specialist: clientType === "hospital" ? (isSpecialist === "unknown" ? null : isSpecialist === "yes") : null,
         contact_email: contactEmail.trim() || undefined,
         website_url: websiteUrl.trim() || undefined,
+        naver_blog_url: naverBlogUrl.trim(),
         aliases: aliases
           .split(",")
           .map((a) => a.trim())
@@ -123,6 +125,17 @@ export function NewClientForm({ client, onSubmit, onClose, onDelete, deleting, c
           <span className="text-[11px] text-gray-400">
             AI가 다르게 부를 수 있는 약칭·영문명·지점명. 답변에 이 이름이 있어도 노출로 셉니다.
           </span>
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-gray-500">
+          네이버 블로그 주소
+          <input
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900"
+            value={naverBlogUrl}
+            onChange={(e) => setNaverBlogUrl(e.target.value)}
+            placeholder="예: https://blog.naver.com/jyphospital"
+          />
+          <span className="text-[11px] text-gray-400">네이버 블로그 검색 결과에서 우리 블로그 글을 찾는 데 씁니다.</span>
         </label>
 
         <label className="flex flex-col gap-1 text-xs text-gray-500">
