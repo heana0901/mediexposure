@@ -293,7 +293,9 @@ function buildReport(data: ClientReportData) {
   ].join("");
 
   const subject = `[AI analytics] ${client.name} AI 노출 리포트 (${period})`;
-  const fileName = `${client.name}_AI노출리포트_${period.replace(/[/~ ]+/g, "")}.pdf`;
+  // 파일 이름에는 만든 날짜(한국 시간)를 붙인다: 박진영병원_AI노출리포트_20261002.pdf
+  const stamp = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, "");
+  const fileName = `${client.name}_AI노출리포트_${stamp}.pdf`;
   return { subject, fileName, full, summary, title: `${client.name} AI 노출 리포트` };
 }
 

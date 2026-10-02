@@ -63,18 +63,23 @@ function getClient(): OpenAI {
   return openai;
 }
 
-/** 답변에서 그 병원 이름이 들어간 문장 (추천 이유의 근거) */
-function sentencesMentioning(rows: Row[], spellings: string[], limit = 3): string[] {
+/**
+ * 답변에서 그 병원 이름이 나온 대목 (추천 이유의 근거).
+ * "**안산21세기병원**"처럼 이름만 있는 제목 줄이면 이유가 적힌 다음 줄까지 붙인다.
+ */
+function passagesMentioning(rows: Row[], spellings: string[], limit = 3): string[] {
   const found: string[] = [];
   for (const r of rows) {
     if (!r.raw_response) continue;
-    const sentences = stripMarkdown(r.raw_response)
-      .split(/\n+|(?<=[.!?。])\s+/)
-      .map((s) => s.replace(/^[\s\-•*\d.)]+/, "").trim())
-      .filter((s) => s.length >= 8);
-    for (const s of sentences) {
-      if (!spellings.some((name) => s.includes(name))) continue;
-      const clipped = s.length > 220 ? `${s.slice(0, 220)}…` : s;
+    const lines = stripMarkdown(r.raw_response)
+      .split(/\n+/)
+      .map((line) => line.replace(/^[\s\-•*\d.)]+/, "").trim())
+      .filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      if (!spellings.some((name) => lines[i].includes(name))) continue;
+      let passage = lines[i];
+      for (let j = i + 1; j < lines.length && j <= i + 2 && passage.length < 60; j++) passage += ` ${lines[j]}`;
+      const clipped = passage.length > 240 ? `${passage.slice(0, 240)}…` : passage;
       if (!found.includes(clipped)) found.push(clipped);
       if (found.length >= limit) return found;
     }
@@ -82,7 +87,10 @@ function sentencesMentioning(rows: Row[], spellings: string[], limit = 3): strin
   return found;
 }
 
-/** AI가 근거로 인용한 페이지 (우리 홈페이지 제외). Gemini 출처는 주소 대신 도메인만 안다 */
+/**
+ * AI가 근거로 인용한 사이트 (우리 홈페이지 제외). 답변 몇 개가 인용했는지 도메인별로 세고,
+ * 실제 주소를 아는 출처(ChatGPT 등)가 있으면 그 페이지를 예시로 붙인다. Gemini 출처는 도메인만 안다.
+ */
 function citedPages(rows: Row[], websiteUrl: string | null | undefined): ContentPrescription["citedPages"] {
   const pages = new Map<string, ContentPrescription["citedPages"][number]>();
   for (const r of rows) {
@@ -91,21 +99,26 @@ function citedPages(rows: Row[], websiteUrl: string | null | undefined): Content
       if (citesDomain([source], websiteUrl)) continue;
       const host = sourceHost(source);
       if (!host) continue;
-      const redirect = !source.url.includes(host);
-      const key = redirect ? host : source.url;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const entry = pages.get(key) ?? {
-        host,
-        title: redirect ? null : source.title || null,
-        url: redirect ? null : source.url,
-        count: 0,
-      };
-      entry.count += 1;
-      pages.set(key, entry);
+      const entry = pages.get(host) ?? { host, title: null, url: null, count: 0 };
+      if (!entry.url && source.url.includes(host)) {
+        entry.url = source.url.replace(/[?&]utm_source=openai$/, "");
+        entry.title = source.title || null;
+      }
+      if (!seen.has(host)) {
+        seen.add(host);
+        entry.count += 1;
+      }
+      pages.set(host, entry);
     }
   }
   return [...pages.values()].sort((a, b) => b.count - a.count).slice(0, 5);
+}
+
+/** 모델이 이유 대신 이름만 되풀이했으면 이유가 없다고 적는다 */
+function reasonOrNone(why: string | undefined, name: string): string {
+  const text = (why ?? "").trim();
+  if (text.length < 6 || text.replace(/\s/g, "") === name.replace(/\s/g, "")) return "답변에 이유가 나오지 않음";
+  return text;
 }
 
 const SCHEMA = {
@@ -184,7 +197,7 @@ AI가 이 질문에 우리 ${subject}을 추천한 횟수: ${item.tally.total}�
 AI가 대신 추천한 곳과, 답변에서 그곳을 언급한 문장:
 ${competitorBlock}
 
-AI가 답변 근거로 인용한 페이지:
+AI가 답변 근거로 인용한 사이트 (인용한 답변 수):
 ${citedBlock}
 
 위 자료로 아래를 JSON으로 써라.
@@ -195,7 +208,7 @@ ${citedBlock}
 - page.slug: 페이지 주소 (영문 소문자와 -만, 예: /spine/disc-herniation)
 - page.summary: 페이지 첫 문단 2~3문장. 질문에 바로 답하는 문장으로 시작하고 ${subject}명과 지역을 넣는다. AI가 그대로 인용하기 좋게 쓴다.
 - page.faqs: 환자가 실제로 물을 질문 5개 (질문만)
-- page.mustHave: 페이지에 꼭 넣을 사실 4~6개. 모르는 값은 {{대표원장 전문 과목}}처럼 빈칸으로 둔다.
+- page.mustHave: 페이지에 꼭 넣을 사실 4~6개. "대표원장 전문의 자격: {{전문 과목}}"처럼 항목 이름을 쓰고 모르는 값만 {{ }} 빈칸으로 둔다. 병원명·홈페이지 주소처럼 당연한 것은 빼고, 이 질문에 답하는 데 필요한 사실을 고른다.
 
 지킬 것:
 - 자료에 없는 ${subject} 정보(장비, 경력, 수술 건수)를 지어내지 않는다.
@@ -306,7 +319,7 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
       const lost = mine.filter((r) => !r.mentioned);
       const rivals = competitorFrequency(lost, { name: client.name, aliases: client.aliases ?? [] })
         .slice(0, 3)
-        .map((c) => ({ name: c.name, count: c.total, quotes: sentencesMentioning(lost, c.spellings ?? [c.name]) }));
+        .map((c) => ({ name: c.name, count: c.total, quotes: passagesMentioning(lost, c.spellings ?? [c.name]) }));
       const cited = citedPages(mine, client.website_url);
       const ownCited = mine.filter((r) => citesDomain(r.sources ?? [], client.website_url)).length;
 
@@ -331,7 +344,7 @@ export async function buildContentPlan(supabase: SupabaseClient, client: ClientL
         competitors: rivals.map((r) => ({
           name: r.name,
           count: r.count,
-          why: screened.drafted.competitors.find((c) => c.name === r.name)?.why ?? "답변에 이유가 나오지 않음",
+          why: reasonOrNone(screened.drafted.competitors.find((c) => c.name === r.name)?.why, r.name),
         })),
         citedPages: cited,
         ownCited,
