@@ -135,9 +135,32 @@ export type VisibilityMetrics = {
 };
 
 export type UsageSummary = {
-  totalRuns: number;
-  totalCostUsd: number;
-  byClient: { clientId: string; clientName: string; runs: number; costUsd: number }[];
+  /** 원화 환산에 쓴 환율(원/달러, 추정) */
+  krwPerUsd: number;
+  /** 이번 달 예상 비용의 계산 근거 */
+  assumptions: {
+    intervalDays: number;
+    providers: Provider[];
+    baseSamples: number;
+    scheduledRunsPerMonth: number;
+  };
+  /** AI별 질문 1회당 비용과 질문당 평균 반복 횟수. measured=false면 실측이 없어 추정값 */
+  costPerCall: Partial<Record<Provider, { usd: number; samples: number; measured: boolean }>>;
+  lastMonth: { label: string; runs: number; costUsd: number };
+  thisMonth: { label: string; runs: number; costUsd: number; remainingRuns: number; projectedUsd: number };
+  byClient: {
+    clientId: string;
+    clientName: string;
+    keywords: number;
+    /** 지금 설정으로 한 번 실행할 때 예상 비용 */
+    perRunUsd: number;
+    lastMonthRuns: number;
+    lastMonthUsd: number;
+    thisMonthRuns: number;
+    thisMonthUsd: number;
+    remainingRuns: number;
+    projectedUsd: number;
+  }[];
 };
 
 export type TrendPoint = {

@@ -76,7 +76,7 @@ export function Dashboard() {
   });
 
   const [trends, setTrends] = useState<TrendPoint[]>([]);
-  const [usage, setUsage] = useState<UsageSummary>({ totalRuns: 0, totalCostUsd: 0, byClient: [] });
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [me, setMe] = useState<{ username: string; isAdmin: boolean } | null>(null);
 
   useEffect(() => {
