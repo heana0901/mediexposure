@@ -290,7 +290,7 @@ function ClientAutomationRow({ client, onSaved }: { client: Client; onSaved: (cl
         </select>
       </td>
       <td className="py-3 pr-3">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 w-max">
           {REPORT_SECTIONS.map((s) => {
             const on = sections.includes(s.key);
             return (

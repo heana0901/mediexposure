@@ -22,7 +22,7 @@ import type { ContentPlan, ContentPrescription, Source } from "./types";
 
 const PLAN_MODEL = process.env.CONTENT_PLAN_MODEL || "gpt-5.4-mini";
 /** 처방 만드는 방식을 바꾸면 올린다. 저장된 처방의 버전이 다르면 새로 만든다 */
-const PLAN_VERSION = 2;
+const PLAN_VERSION = 3;
 /** 한 번에 처방하는 질문 수 */
 const MAX_ITEMS = 3;
 /** 추천 확률이 이 값 이상인 질문은 처방하지 않는다 */
@@ -261,7 +261,10 @@ function screenRisky(drafted: Drafted): { drafted: Drafted; cautions: string[] }
       page: {
         ...drafted.page,
         faqs: keep(drafted.page.faqs, "FAQ").slice(0, 5),
-        mustHave: keep(drafted.page.mustHave, "꼭 넣을 정보").slice(0, 6),
+        // 모델이 빈 빈칸 {{}}을 남기면 무엇을 채울지 알 수 있게 바꾼다
+        mustHave: keep(drafted.page.mustHave, "꼭 넣을 정보")
+          .map((m) => m.replace(/\{\{\s*\}\}/g, "{{병원에서 채울 내용}}"))
+          .slice(0, 6),
       },
     },
     cautions,
