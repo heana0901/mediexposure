@@ -122,6 +122,8 @@ export async function checkLocations(client: ClientLike, rows: Row[]): Promise<L
     roadAddress: ours?.roadAddress || client.region || "",
     gu: words.find((w) => /구$/.test(w)) ?? null,
     dong: ours ? (words.find((w) => /[가-힣0-9]+동$/.test(w)) ?? null) : null,
+    lat: ours?.lat ?? null,
+    lng: ours?.lng ?? null,
   };
   const here = ours?.lat && ours?.lng ? { lat: ours.lat, lng: ours.lng } : null;
   const city = cityOf(client.region);

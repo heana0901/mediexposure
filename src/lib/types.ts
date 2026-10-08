@@ -210,7 +210,15 @@ export type LocationClaim = {
 /** AI가 잘못 알고 있는 우리 병원 정보 (지금은 위치) */
 export type LocationCheck = {
   /** 네이버 플레이스로 확인한 실제 위치. 확인하지 못했으면 null */
-  actual: { address: string; roadAddress: string; gu: string | null; dong: string | null } | null;
+  actual: {
+    address: string;
+    roadAddress: string;
+    gu: string | null;
+    dong: string | null;
+    /** 네이버 플레이스 좌표 (홈페이지 구조화 데이터의 geo에 쓴다) */
+    lat?: number | null;
+    lng?: number | null;
+  } | null;
   /** 우리 병원 위치를 말한 답변 수 */
   mentions: number;
   /** 틀린 위치를 말한 답변 수 */

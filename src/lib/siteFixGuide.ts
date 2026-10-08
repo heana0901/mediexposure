@@ -1,4 +1,5 @@
 import { AXIS_META, type CheckResult, type SiteDiagnosis } from "./diagnose-shared";
+import type { ContentPrescription, LocationCheck } from "./types";
 
 /**
  * 홈페이지 제작·관리 담당자에게 넘기는 '수정 요청서'의 내용.
@@ -15,6 +16,8 @@ export type FixContext = {
   aliases?: string[];
   naverBlogUrl?: string | null;
   isClinic?: boolean;
+  /** 네이버 플레이스로 확인한 실제 위치. 있으면 예시 코드의 주소·좌표를 채운다 */
+  place?: LocationCheck["actual"];
 };
 
 type Guide = {
@@ -297,6 +300,43 @@ function shortRegion(region?: string | null): string {
   return city ? city.replace(/(특별시|광역시|시)$/, "") : "{{지역}}";
 }
 
+/** "경기도 안산시 단원구 광덕대로 181 BYC빌딩 2층" → 시·도 / 시·군·구 / 나머지 도로명 주소 */
+function splitAddress(road: string): { region: string; locality: string; street: string } {
+  const tokens = road.split(/\s+/).filter(Boolean);
+  const region = /(도|특별시|광역시|특별자치시|특별자치도)$/.test(tokens[0] ?? "") ? tokens.shift()! : "";
+  const locality: string[] = [];
+  while (tokens.length && /(시|군|구)$/.test(tokens[0])) locality.push(tokens.shift()!);
+  return { region, locality: locality.join(" "), street: tokens.join(" ") };
+}
+
+function postalAddressJson(ctx: FixContext): string {
+  const road = ctx.place?.roadAddress;
+  if (!road) {
+    return `"address": {
+    "@type": "PostalAddress",
+    "streetAddress": "${ctx.region ?? "{{도로명 주소}}"}",
+    "addressCountry": "KR"
+  }`;
+  }
+  const { region, locality, street } = splitAddress(road);
+  const geo =
+    ctx.place?.lat && ctx.place?.lng
+      ? `,
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": ${ctx.place.lat.toFixed(6)},
+    "longitude": ${ctx.place.lng.toFixed(6)}
+  }`
+      : "";
+  return `"address": {
+    "@type": "PostalAddress",
+    "streetAddress": "${street}",
+    "addressLocality": "${locality}",
+    "addressRegion": "${region}",
+    "addressCountry": "KR"
+  }${geo}`;
+}
+
 function hospitalJsonLd(ctx: FixContext & { hospitalName: string; origin: string }): string {
   const sameAs = [ctx.naverBlogUrl || null, "{{네이버 플레이스 주소}}", "{{유튜브 채널 주소}}", "{{인스타그램 주소}}"]
     .filter(Boolean)
@@ -313,11 +353,7 @@ function hospitalJsonLd(ctx: FixContext & { hospitalName: string; origin: string
   "name": "${ctx.hospitalName}",${alternate}
   "url": "${ctx.origin}/",
   "telephone": "{{대표 전화번호}}",
-  "address": {
-    "@type": "PostalAddress",
-    "streetAddress": "${ctx.region ?? "{{도로명 주소}}"}",
-    "addressCountry": "KR"
-  },
+  ${postalAddressJson(ctx)},
   "medicalSpecialty": "${ctx.department ?? "{{진료과}}"}",
   "openingHours": "{{예: Mo-Fr 09:00-18:00}}",
   "sameAs": [
@@ -390,7 +426,99 @@ export function extraRecommendations(ctx: FixContext): { title: string; why: str
     {
       title: "주소·전화번호를 모든 채널에서 똑같이",
       why: "AI 답변이 병원 위치를 서로 다르게 말하는 경우가 있습니다. 홈페이지·네이버 플레이스·구글 비즈니스·카카오맵·병원 정보 사이트의 상호·주소·전화가 한 글자도 다르지 않아야 합니다.",
-      steps: ["홈페이지 하단(푸터)에 정식 상호·도로명 주소·대표 전화를 텍스트로 적고, 다른 채널도 같은 값으로 맞춥니다."],
+      steps: [
+        `홈페이지 하단(푸터)에 정식 상호·도로명 주소${ctx.place?.roadAddress ? `(${ctx.place.roadAddress})` : ""}·대표 전화를 텍스트로 적고, 다른 채널도 같은 값으로 맞춥니다.`,
+      ],
     },
   ];
+}
+
+export type ExtraTask = { title: string; current: string; why: string; steps: string[]; code: string | null; verify: string };
+
+/**
+ * AI가 병원 위치를 틀리게 말할 때 홈페이지에서 할 일.
+ * AI 답변에서 찾은 틀린 위치를 근거로 보여 주고, 실제 주소·좌표를 채운 코드를 준다.
+ */
+export function locationFixTask(ctx: FixContext, check: LocationCheck): ExtraTask | null {
+  if (!check.wrong || !check.actual) return null;
+  const { origin } = originOf(ctx.siteUrl);
+  const actual = check.actual;
+  const where = [actual.gu, actual.dong].filter(Boolean).join(" ");
+  const examples = check.claims
+    .filter((c) => c.verdict === "wrong")
+    .slice(0, 3)
+    .map((c) => `'${c.text}'`)
+    .join(", ");
+  return {
+    title: "AI가 잘못 알고 있는 병원 위치 바로잡기",
+    current: `최근 AI 답변 ${check.mentions}개 중 ${check.wrong}개가 병원 위치를 틀리게 말했습니다 (예: ${examples}). 실제 위치는 ${where} (${actual.roadAddress})입니다.`,
+    why: "AI는 홈페이지·지도·병원 정보 사이트에서 주소를 모아 답합니다. 홈페이지에 주소가 이미지로만 있거나 구조화 데이터에 주소·좌표가 없으면 다른 지역 정보와 섞여 엉뚱한 동네로 소개되고, 환자는 다른 지역 병원으로 오해합니다.",
+    steps: [
+      `모든 페이지 공통 하단(푸터)에 주소를 글자로 넣습니다: "${actual.roadAddress}${actual.dong ? ` (${actual.dong})` : ""}". 지도 이미지나 캡처만으로 두지 않습니다.`,
+      `'오시는 길' 페이지 첫 문단에 동네 이름과 가까운 역을 문장으로 적습니다. 예: "${ctx.hospitalName}은 ${shortRegion(ctx.region)} ${where}에 있습니다. {{가까운 역}}에서 도보 {{N}}분입니다."`,
+      "아래 의료기관 구조화 데이터(JSON-LD)를 모든 페이지 <head>에 넣습니다. 주소와 좌표는 네이버 플레이스 기준으로 채워 두었습니다.",
+      "네이버 플레이스·구글 비즈니스 프로필·카카오맵의 주소도 위와 한 글자도 다르지 않게 맞춥니다 (마케팅 담당 확인).",
+    ],
+    code: hospitalJsonLd({ ...ctx, origin }),
+    verify:
+      "validator.schema.org에서 address와 geo가 인식되는지 확인합니다. 이후 AI analytics 리포트의 'AI가 잘못 알고 있는 우리 병원 정보'에서 틀린 답변 수가 줄어드는지 봅니다 (AI에 반영되기까지 시간이 걸릴 수 있습니다).",
+  };
+}
+
+/** HTML에 넣을 글자 */
+function htmlText(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** 콘텐츠 처방의 페이지 설계서를 개발자가 바로 만들 수 있는 페이지 사양으로 */
+export function newPageTask(ctx: FixContext, item: ContentPrescription): ExtraTask {
+  const { origin } = originOf(ctx.siteUrl);
+  const slug = item.page.slug.startsWith("/") ? item.page.slug : `/${item.page.slug}`;
+  const url = `${origin}${slug}`;
+  const description = item.page.summary.length > 110 ? `${item.page.summary.slice(0, 108)}…` : item.page.summary;
+  const faqJson = item.page.faqs
+    .map(
+      (q) => `    {
+      "@type": "Question",
+      "name": "${q.replace(/"/g, '\\"')}",
+      "acceptedAnswer": { "@type": "Answer", "text": "{{본문의 답변과 같은 내용 2~3문장}}" }
+    }`
+    )
+    .join(",\n");
+  const code = `<!-- ${url} -->
+<head>
+  <title>${htmlText(item.page.title)} | ${htmlText(ctx.hospitalName)}</title>
+  <meta name="description" content="${htmlText(description)}">
+  <link rel="canonical" href="${url}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+${faqJson}
+    ]
+  }
+  </script>
+</head>
+<body>
+  <h1>${htmlText(item.page.title)}</h1>
+  <p>${htmlText(item.page.summary)}</p>
+${item.page.faqs.map((q) => `  <h2>${htmlText(q)}</h2>\n  <p>{{답변 2~3문장}}</p>`).join("\n")}
+</body>`;
+  const volume = item.volume === null ? "검색량 모름" : `월 ${item.volume.toLocaleString()}회 검색`;
+  const rivals = item.competitors.map((c) => c.name).join(", ");
+  return {
+    title: item.page.title,
+    current: `대상 질문 '${item.question}' · ${volume} · 지금 AI 추천 ${item.tally.count}/${item.tally.total}회${rivals ? ` · AI가 대신 추천: ${rivals}` : ""}`,
+    why: item.gap,
+    steps: [
+      `주소 ${url} 로 새 페이지를 만들고, 메인 메뉴(또는 진료 안내 메뉴)와 관련 진료 페이지에서 이 페이지로 링크합니다.`,
+      "아래 코드처럼 제목(title)·설명(description)·H1을 넣고, 첫 문단은 질문에 바로 답하는 문장으로 본문 맨 위에 글자로 둡니다.",
+      "환자 질문을 H2 소제목으로 쓰고 바로 아래에 2~3문장으로 답합니다. 같은 내용을 FAQ 구조화 데이터에도 넣습니다.",
+      `꼭 넣을 정보: ${item.page.mustHave.join(" / ")}`,
+      "sitemap.xml에 이 주소를 추가하고, 네이버 서치어드바이저·구글 서치 콘솔에서 수집을 요청합니다.",
+    ],
+    code,
+    verify: `페이지가 열리면 AI analytics에서 '${item.question}' 질문의 AI 추천 확률과 '우리 홈페이지 인용' 횟수가 오르는지 다음 리포트부터 확인합니다.`,
+  };
 }

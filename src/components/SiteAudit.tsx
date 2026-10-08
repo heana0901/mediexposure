@@ -416,7 +416,7 @@ export function SiteAudit({
                           {new Date(resultDate).toLocaleString("ko-KR")} 분석
                         </span>
                       )}
-                      {primary.checks.some((c) => c.status !== "pass") && (
+                      {(clientId || primary.checks.some((c) => c.status !== "pass")) && (
                         <button
                           className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
                           disabled={makingPdf}
@@ -424,6 +424,8 @@ export function SiteAudit({
                           onClick={async () => {
                             setMakingPdf(true);
                             try {
+                              // 병원으로 저장된 분석이면 AI 답변 분석(위치 오류·새로 만들 페이지)도 함께 넣는다
+                              const plan = clientId ? await api.getContentPlan(clientId).catch(() => null) : null;
                               await downloadSiteFixPdf(
                                 primary as SiteDiagnosis,
                                 {
@@ -435,7 +437,8 @@ export function SiteAudit({
                                   naverBlogUrl: client?.naver_blog_url ?? null,
                                   isClinic: /의원$/.test(client?.name ?? savedClientName ?? ""),
                                 },
-                                resultDate
+                                resultDate,
+                                plan
                               );
                             } catch (e) {
                               setError(e instanceof Error ? e.message : String(e));

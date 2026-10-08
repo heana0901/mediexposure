@@ -2,7 +2,16 @@
 
 import { createRoot } from "react-dom/client";
 import { AXIS_META, AXIS_ORDER, type SiteDiagnosis } from "@/lib/diagnose-shared";
-import { buildFixItems, extraRecommendations, type FixContext, type FixItem } from "@/lib/siteFixGuide";
+import {
+  buildFixItems,
+  extraRecommendations,
+  locationFixTask,
+  newPageTask,
+  type ExtraTask,
+  type FixContext,
+  type FixItem,
+} from "@/lib/siteFixGuide";
+import type { ContentPlan } from "@/lib/types";
 import { saveBlocksAsPdf } from "@/lib/pdfBlocks";
 
 /**
@@ -90,8 +99,65 @@ function ItemBlock({ item, index }: { item: FixItem; index: number }) {
   );
 }
 
-function ReportBody({ diagnosis, ctx, auditedAt }: { diagnosis: SiteDiagnosis; ctx: FixContext; auditedAt: string }) {
+/** 진단 항목 밖의 작업(위치 바로잡기·새 페이지) */
+function TaskBlock({ badge, title, task }: { badge: { label: string; color: string; bg: string }; title: string; task: ExtraTask }) {
+  return (
+    <Block style={{ borderTop: `1px solid ${LINE}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>{title}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: badge.color, background: badge.bg, borderRadius: 4, padding: "2px 7px" }}>
+          {badge.label}
+        </span>
+      </div>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 6, lineHeight: 1.6 }}>
+        <b style={{ color: INK }}>현재 상태</b> · {task.current}
+      </div>
+      <div style={{ fontSize: 12, color: "#374151", marginBottom: 6, lineHeight: 1.6 }}>
+        <b style={{ color: INK }}>왜 필요한가요</b> · {task.why}
+      </div>
+      <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.6 }}>
+        <b style={{ color: INK }}>작업 방법</b>
+        <ol style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+          {task.steps.map((step, i) => (
+            <li key={i} style={{ marginBottom: 2 }}>
+              {step}
+            </li>
+          ))}
+        </ol>
+      </div>
+      {task.code && <Code code={task.code} />}
+      <div style={{ fontSize: 11.5, color: "#065f46", background: "#ecfdf5", borderRadius: 6, padding: "6px 10px", marginTop: 8 }}>
+        <b>완료 확인</b> · {task.verify}
+      </div>
+    </Block>
+  );
+}
+
+function SectionHead({ title, note }: { title: string; note: string }) {
+  return (
+    <Block style={{ borderTop: `2px solid ${INK}`, marginTop: 8 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{title}</div>
+      <div style={{ fontSize: 12, color: MUTED, marginTop: 4, lineHeight: 1.6 }}>{note}</div>
+    </Block>
+  );
+}
+
+function ReportBody({
+  diagnosis,
+  ctx: baseCtx,
+  auditedAt,
+  plan,
+}: {
+  diagnosis: SiteDiagnosis;
+  ctx: FixContext;
+  auditedAt: string;
+  plan: ContentPlan | null;
+}) {
+  // 위치 확인 결과가 있으면 모든 예시 코드의 주소·좌표를 실제 값으로 채운다
+  const ctx: FixContext = { ...baseCtx, place: baseCtx.place ?? plan?.locationCheck?.actual ?? null };
   const items = buildFixItems(diagnosis, ctx);
+  const locationTask = plan?.locationCheck ? locationFixTask(ctx, plan.locationCheck) : null;
+  const pageTasks = (plan?.items ?? []).map((item) => newPageTask(ctx, item));
   const fails = items.filter((i) => i.check.status === "fail").length;
   const warns = items.length - fails;
   const totalGain = Math.min(100 - diagnosis.score, Math.round(items.reduce((s, i) => s + i.gain, 0)));
@@ -112,6 +178,8 @@ function ReportBody({ diagnosis, ctx, auditedAt }: { diagnosis: SiteDiagnosis; c
           이 문서는 홈페이지 제작·관리 담당자께 드리는 작업 목록입니다. 검색엔진과 생성형 AI(ChatGPT·Gemini·Perplexity
           등)가 홈페이지를 제대로 읽고 병원을 정확하게 소개·인용할 수 있도록, 서버가 처음 보내는 HTML을 기준으로 25개
           항목을 점검했습니다. 위에서부터 순서대로 작업해 주시면 효과가 큰 것부터 반영됩니다.
+          {(locationTask || pageTasks.length > 0) &&
+            " 실제 AI 답변을 분석해 찾은 위치 오류와 새로 만들 페이지도 함께 넣었습니다."}
         </p>
       </Block>
 
@@ -144,14 +212,75 @@ function ReportBody({ diagnosis, ctx, auditedAt }: { diagnosis: SiteDiagnosis; c
             <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4 }}>+{totalGain}점</div>
           </div>
         </div>
+        {(locationTask || pageTasks.length > 0) && (
+          <div style={{ fontSize: 12, color: INK, marginTop: 10 }}>
+            이 밖에{locationTask ? " · 병원 위치 바로잡기 1건" : ""}
+            {pageTasks.length > 0 ? ` · 새로 만들 페이지 ${pageTasks.length}개` : ""}
+          </div>
+        )}
         <div style={{ fontSize: 11.5, color: MUTED, marginTop: 10, lineHeight: 1.6 }}>
           예시 코드의 {"{{ }}"} 부분은 실제 값으로 바꿔 주세요. 확인되지 않은 정보(전화번호·채널 주소 등)는 비워 두었습니다.
         </div>
       </Block>
 
+      {locationTask && (
+        <>
+          <SectionHead
+            title="가장 먼저: AI가 잘못 알고 있는 병원 위치"
+            note="AI 답변에서 병원 이름 옆에 붙은 위치를 네이버 플레이스의 실제 위치와 비교했습니다. 환자가 다른 지역 병원으로 오해할 수 있어 가장 먼저 고칠 일입니다."
+          />
+          <TaskBlock badge={{ label: "가장 먼저", color: "#dc2626", bg: "#fef2f2" }} title={locationTask.title} task={locationTask} />
+          <Block>
+            <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 6 }}>AI가 틀리게 말한 위치 (근거)</div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+              <tbody>
+                {plan!.locationCheck!.claims
+                  .filter((c) => c.verdict === "wrong")
+                  .slice(0, 6)
+                  .map((c) => (
+                    <tr key={c.text}>
+                      <td style={{ padding: "6px 4px", borderBottom: `1px solid ${LINE}`, color: INK }}>
+                        {c.text}
+                        <div style={{ color: MUTED, fontSize: 10.5 }}>
+                          {c.providers.join("·")}
+                          {c.example.question ? ` · 질문: ${c.example.question}` : ""}
+                        </div>
+                      </td>
+                      <td style={{ padding: "6px 4px", borderBottom: `1px solid ${LINE}`, color: "#b91c1c" }}>{c.reason}</td>
+                      <td style={{ padding: "6px 4px", borderBottom: `1px solid ${LINE}`, color: MUTED, textAlign: "right", whiteSpace: "nowrap" }}>
+                        답변 {c.count}개
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </Block>
+        </>
+      )}
+
+      {(locationTask || pageTasks.length > 0) && (
+        <SectionHead title="홈페이지 진단 항목" note="25개 점검 항목 중 고칠 것입니다. 점수가 많이 오르는 것부터 적었습니다." />
+      )}
       {items.map((item, i) => (
         <ItemBlock key={`${item.check.id}-${i}`} item={item} index={i + 1} />
       ))}
+
+      {pageTasks.length > 0 && (
+        <>
+          <SectionHead
+            title="새로 만들 페이지"
+            note="환자가 많이 검색하는데 AI가 우리 병원을 잘 추천하지 않는 질문에 답하는 페이지입니다. 구조와 코드는 그대로 적용하고, 본문 원고는 병원에서 확인한 내용으로 채워 주세요. 의료법 제56조에 따라 치료 후기·전후 사진·최상급·비교·보장 표현은 쓰지 않습니다."
+          />
+          {pageTasks.map((task, i) => (
+            <TaskBlock
+              key={task.title}
+              badge={{ label: `새 페이지 ${i + 1}`, color: "#2563eb", bg: "#eff6ff" }}
+              title={task.title}
+              task={task}
+            />
+          ))}
+        </>
+      )}
 
       <Block style={{ borderTop: `2px solid ${INK}`, marginTop: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>추가 권장 작업</div>
@@ -181,7 +310,12 @@ function ReportBody({ diagnosis, ctx, auditedAt }: { diagnosis: SiteDiagnosis; c
 }
 
 /** 요청서를 그려 A4 PDF로 저장한다. 블록 단위로 페이지를 나누고, 한 블록이 한 페이지보다 길면 잘라 넣는다. */
-export async function downloadSiteFixPdf(diagnosis: SiteDiagnosis, ctx: FixContext, auditedAt: string | null) {
+export async function downloadSiteFixPdf(
+  diagnosis: SiteDiagnosis,
+  ctx: FixContext,
+  auditedAt: string | null,
+  plan: ContentPlan | null = null
+) {
   const host = document.createElement("div");
   host.style.position = "fixed";
   host.style.left = "-99999px";
@@ -190,7 +324,7 @@ export async function downloadSiteFixPdf(diagnosis: SiteDiagnosis, ctx: FixConte
   const root = createRoot(host);
 
   try {
-    root.render(<ReportBody diagnosis={diagnosis} ctx={ctx} auditedAt={auditedAt ?? new Date().toISOString()} />);
+    root.render(<ReportBody diagnosis={diagnosis} ctx={ctx} auditedAt={auditedAt ?? new Date().toISOString()} plan={plan} />);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     await saveBlocksAsPdf(host, `${ctx.hospitalName}_홈페이지_수정요청서.pdf`);

@@ -23,7 +23,7 @@ import type { ContentPlan, ContentPrescription, Source } from "./types";
 
 const PLAN_MODEL = process.env.CONTENT_PLAN_MODEL || "gpt-5.4-mini";
 /** 처방 만드는 방식을 바꾸면 올린다. 저장된 처방의 버전이 다르면 새로 만든다 */
-const PLAN_VERSION = 4;
+const PLAN_VERSION = 5;
 /** 한 번에 처방하는 질문 수 */
 const MAX_ITEMS = 3;
 /** 추천 확률이 이 값 이상인 질문은 처방하지 않는다 */
