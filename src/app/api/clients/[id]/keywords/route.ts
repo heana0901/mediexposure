@@ -6,6 +6,9 @@ import { ensureVariants } from "@/lib/keywordVariants";
 import { ensureSearchKeywords, refreshSearchVolumes } from "@/lib/naver/demand";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** 표현을 새로 만들 때(AI 호출) 시간이 걸릴 수 있다 */
+export const maxDuration = 60;
+
 /** 새 질문에 같은 의도의 다른 표현을 만들어 붙인 뒤, 저장된 행을 다시 읽어 돌려준다 */
 async function withVariants(supabase: SupabaseClient, clientId: string, rows: { id: string; text: string; variants?: unknown }[]) {
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).maybeSingle();
@@ -34,7 +37,8 @@ export async function GET(
   const { data, error } = await selectActiveKeywords(supabase, id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  // 저장된 표현 중 주제를 벗어난 것이 있으면 여기서 새로 만들어, 화면이 다음 측정에 쓸 표현을 바로 보여 주게 한다
+  return NextResponse.json(await withVariants(supabase, id, data ?? []));
 }
 
 export async function POST(
