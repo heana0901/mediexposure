@@ -35,13 +35,55 @@ export function regionForms(region: string | null | undefined): string[] {
   return [...new Set(forms)].sort((a, b) => b.length - a.length);
 }
 
-/** "경기도 안산시 단원구 …" → "안산", "서울특별시 강남구 …" → "서울". 모르면 빈 문자열 */
-export function cityName(region: string | null | undefined): string {
-  const tokens = (region ?? "").split(/\s+/);
-  const metro = tokens.map((t) => t.match(/^(.+?)(특별자치시|특별시|광역시)$/)).find(Boolean);
-  if (metro) return metro[1];
-  const city = tokens.find((t) => /^[가-힣]{2,}(시|군)$/.test(t));
-  return city ? city.slice(0, -1) : "";
+export type RegionRule = {
+  /** 표현에 쓸 지역 표기. 원래 질문에 지역이 있으면 그 표기, 없으면 시·군 이름. 모르면 빈 문자열 */
+  place: string;
+  /** 표현에 들어가면 안 되는 말: 원래 질문보다 좁거나 넓은 지역, 병원 도로명 주소 */
+  banned: string[];
+};
+
+/**
+ * 표현이 지켜야 할 지역 범위.
+ *
+ * 표현을 만들 때 병원 주소를 그대로 쓰면("광덕대로 181 신경외과") 우리 병원 위치를 AI에 알려 주는 셈이 되어
+ * 노출률이 부풀고, 원래 "안산"으로 묻던 질문을 "단원구"로 좁히면 다른 질문을 재게 된다.
+ * 그래서 원래 질문에 있는 지역 단계만 허용하고(없으면 시·군), 나머지 단계와 도로명은 금지한다.
+ */
+export function regionRule(keyword: string, region: string | null | undefined): RegionRule {
+  const words = keyword.trim().split(/\s+/);
+  type Level = { full: string; short: string | null; city: boolean };
+  const levels: Level[] = [];
+  const roads: string[] = [];
+  for (const token of (region ?? "").split(/\s+/)) {
+    const metro = token.match(/^(.+?)(특별자치시|특별자치도|특별시|광역시)$/);
+    if (metro) levels.push({ full: token, short: metro[1], city: true });
+    else if (/^[가-힣]{2,}(시|군)$/.test(token)) levels.push({ full: token, short: token.slice(0, -1), city: true });
+    else if (/^[가-힣]{2,}(도|구|동|읍|면)$/.test(token)) levels.push({ full: token, short: token.length >= 3 ? token.slice(0, -1) : null, city: false });
+    else if (/^[가-힣0-9]{2,}(로|길)$/.test(token)) roads.push(token);
+  }
+
+  // 주제어를 뽑을 때와 같은 기준: 단어가 지역명 그대로이거나, 지역명 뒤에 두 글자 이상 붙었을 때("안산정형외과")만
+  // 지역으로 본다. "화정역"의 "화정"처럼 한 글자만 붙은 말은 지역이 아니라 주제어다.
+  const names = (form: string | null) => form !== null && words.some((w) => w === form || (w.startsWith(form) && w.length - form.length >= 2));
+  let allowed = levels.filter((l) => names(l.full) || names(l.short));
+  let place = allowed.map((l) => (names(l.full) ? l.full : l.short!)).join(" ");
+  if (allowed.length === 0) {
+    // 원래 질문에 지역이 없으면 시·군 단위로만 묻는다
+    allowed = levels.filter((l) => l.city).slice(-1);
+    place = allowed[0]?.short ?? "";
+  }
+
+  const banned = levels
+    .filter((l) => !allowed.includes(l))
+    // 시·군은 줄임말("안산")도 흔히 쓰므로 함께 막고, 도·구·동은 정식 표기만 막는다
+    .flatMap((l) => (l.city && l.short ? [l.full, l.short] : [l.full]));
+  return { place, banned: [...banned, ...roads] };
+}
+
+/** 표현이 지역 범위를 지키는지 (금지된 지역·도로명이 없는지) */
+export function keepsRegion(variant: string, rule: RegionRule): boolean {
+  const compact = variant.replace(/\s+/g, "");
+  return rule.banned.every((b) => !compact.includes(b));
 }
 
 /**
