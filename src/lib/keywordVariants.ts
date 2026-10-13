@@ -150,7 +150,7 @@ export async function generateVariants(keyword: string, context: ClientContext):
     if (variants.length < 2 && topic.length > 0) variants = [...new Set([...variants, ...keep(plainVariants(topic, region, context))])];
   }
 
-  return { variants: variants.slice(0, 4), note: first.note };
+  return { variants: variants.slice(0, WANTED), note: first.note };
 }
 
 /**

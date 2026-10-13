@@ -18,19 +18,48 @@ const GENERIC_SUFFIXES = ["병원", "의원"];
 /** 이보다 많이 남으면 문장형 질문이라 주제어를 기계적으로 뽑지 않는다 */
 const MAX_TOPIC_TOKENS = 3;
 
-/** "경기도 안산시 단원구 광덕대로 181" → ["경기도", "경기", "안산시", "안산", "단원구", "단원"] */
-export function regionForms(region: string | null | undefined): string[] {
-  const forms: string[] = [];
+/** 시·도 이름의 여러 표기. 병원 주소는 "경기"인데 질문은 "경기도"처럼 서로 다르게 적혀도 같은 지역으로 본다 */
+const PROVINCES: { names: string[]; metro: boolean }[] = [
+  { names: ["서울특별시", "서울시", "서울"], metro: true },
+  { names: ["부산광역시", "부산시", "부산"], metro: true },
+  { names: ["대구광역시", "대구시", "대구"], metro: true },
+  { names: ["인천광역시", "인천시", "인천"], metro: true },
+  { names: ["광주광역시", "광주시", "광주"], metro: true },
+  { names: ["대전광역시", "대전시", "대전"], metro: true },
+  { names: ["울산광역시", "울산시", "울산"], metro: true },
+  { names: ["세종특별자치시", "세종시", "세종"], metro: true },
+  { names: ["경기도", "경기"], metro: false },
+  { names: ["강원특별자치도", "강원도", "강원"], metro: false },
+  { names: ["충청북도", "충북"], metro: false },
+  { names: ["충청남도", "충남"], metro: false },
+  { names: ["전북특별자치도", "전라북도", "전북"], metro: false },
+  { names: ["전라남도", "전남"], metro: false },
+  { names: ["경상북도", "경북"], metro: false },
+  { names: ["경상남도", "경남"], metro: false },
+  { names: ["제주특별자치도", "제주도", "제주"], metro: false },
+];
+
+/** 주소의 지역 단계 하나. forms[0]이 주소에 적힌 표기(또는 정식 이름)이고 나머지는 같은 곳의 다른 표기 */
+type Level = { forms: string[]; kind: "province" | "city" | "district" };
+
+/** "경기도 안산시 단원구 광덕대로 181" → 도·시·구 단계와 도로명 */
+function parseRegion(region: string | null | undefined): { levels: Level[]; roads: string[] } {
+  const levels: Level[] = [];
+  const roads: string[] = [];
   for (const token of (region ?? "").split(/\s+/)) {
-    const long = token.match(/^(.+?)(특별자치시|특별자치도|특별시|광역시)$/);
-    if (long) {
-      forms.push(token, long[1]);
-      continue;
-    }
-    if (!/^[가-힣]{2,}(도|시|군|구|동|읍|면)$/.test(token)) continue;
-    forms.push(token);
-    if (token.length >= 3) forms.push(token.slice(0, -1));
+    // 시·도는 주소 맨 앞에서만 찾는다 ("경기도 광주시"의 광주시는 광역시가 아니다)
+    const province = levels.length === 0 ? PROVINCES.find((p) => p.names.includes(token)) : undefined;
+    if (province) levels.push({ forms: province.names, kind: province.metro ? "city" : "province" });
+    else if (/^[가-힣]{2,}(시|군)$/.test(token)) levels.push({ forms: [token, token.slice(0, -1)], kind: "city" });
+    else if (/^[가-힣]{2,}(도|구|동|읍|면)$/.test(token)) levels.push({ forms: token.length >= 3 ? [token, token.slice(0, -1)] : [token], kind: "district" });
+    else if (/^[가-힣0-9]{2,}(로|길)$/.test(token)) roads.push(token);
   }
+  return { levels, roads };
+}
+
+/** "경기도 안산시 단원구 광덕대로 181" → ["경기도", "안산시", "단원구", "경기", "안산", "단원"] (긴 것부터) */
+export function regionForms(region: string | null | undefined): string[] {
+  const forms = parseRegion(region).levels.flatMap((l) => l.forms);
   // 긴 것부터: "안산시정형외과"에서 "안산"보다 "안산시"를 먼저 뗀다
   return [...new Set(forms)].sort((a, b) => b.length - a.length);
 }
@@ -51,32 +80,30 @@ export type RegionRule = {
  */
 export function regionRule(keyword: string, region: string | null | undefined): RegionRule {
   const words = keyword.trim().split(/\s+/);
-  type Level = { full: string; short: string | null; city: boolean };
-  const levels: Level[] = [];
-  const roads: string[] = [];
-  for (const token of (region ?? "").split(/\s+/)) {
-    const metro = token.match(/^(.+?)(특별자치시|특별자치도|특별시|광역시)$/);
-    if (metro) levels.push({ full: token, short: metro[1], city: true });
-    else if (/^[가-힣]{2,}(시|군)$/.test(token)) levels.push({ full: token, short: token.slice(0, -1), city: true });
-    else if (/^[가-힣]{2,}(도|구|동|읍|면)$/.test(token)) levels.push({ full: token, short: token.length >= 3 ? token.slice(0, -1) : null, city: false });
-    else if (/^[가-힣0-9]{2,}(로|길)$/.test(token)) roads.push(token);
-  }
+  const { levels, roads } = parseRegion(region);
 
   // 주제어를 뽑을 때와 같은 기준: 단어가 지역명 그대로이거나, 지역명 뒤에 두 글자 이상 붙었을 때("안산정형외과")만
   // 지역으로 본다. "화정역"의 "화정"처럼 한 글자만 붙은 말은 지역이 아니라 주제어다.
-  const names = (form: string | null) => form !== null && words.some((w) => w === form || (w.startsWith(form) && w.length - form.length >= 2));
-  let allowed = levels.filter((l) => names(l.full) || names(l.short));
-  let place = allowed.map((l) => (names(l.full) ? l.full : l.short!)).join(" ");
+  const named = (form: string) => words.some((w) => w === form || (w.startsWith(form) && w.length - form.length >= 2));
+  let allowed = levels.filter((l) => l.forms.some(named));
+  // 질문에 적힌 표기 그대로 쓴다 ("경기도"로 물었으면 "경기도")
+  let place = allowed.map((l) => l.forms.find(named)!).join(" ");
   if (allowed.length === 0) {
     // 원래 질문에 지역이 없으면 시·군 단위로만 묻는다
-    allowed = levels.filter((l) => l.city).slice(-1);
-    place = allowed[0]?.short ?? "";
+    allowed = levels.filter((l) => l.kind === "city").slice(-1);
+    place = allowed[0] ? [...allowed[0].forms].sort((a, b) => a.length - b.length)[0] : "";
   }
 
   const banned = levels
     .filter((l) => !allowed.includes(l))
-    // 시·군은 줄임말("안산")도 흔히 쓰므로 함께 막고, 도·구·동은 정식 표기만 막는다
-    .flatMap((l) => (l.city && l.short ? [l.full, l.short] : [l.full]));
+    .flatMap((l) => {
+      // 시·군은 줄임말("안산")도 흔히 쓰므로 모든 표기를 막는다
+      if (l.kind === "city") return l.forms;
+      // 도는 모든 표기를 막되, "경기"는 '시합'이라는 뜻으로도 쓰여서 뺀다
+      if (l.kind === "province") return l.forms.filter((f) => f !== "경기");
+      // 구·동은 정식 표기만 막는다 ("단원"·"화정"은 다른 말에도 들어간다)
+      return [l.forms[0]];
+    });
   return { place, banned: [...banned, ...roads] };
 }
 
