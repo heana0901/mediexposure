@@ -494,14 +494,16 @@ export async function runDiagnosis(target: URL): Promise<SiteDiagnosis> {
 
   /* 9. 이미지 대체 텍스트 */
   const imgs = html.match(/<img\b[^>]*>/gi) ?? [];
-  const missingAlt = imgs.filter((tag) => !/\balt\s*=\s*["'][^"']+["']/i.test(tag)).length;
+  // alt=""(빈 값)는 꾸밈 이미지나 바로 옆에 글자가 있는 아이콘에 쓰는 올바른 표기라 누락으로 세지 않는다
+  const missingAlt = imgs.filter((tag) => !/\balt\s*=/i.test(tag)).length;
+  const emptyAlt = imgs.filter((tag) => /\balt\s*=\s*(""|'')/i.test(tag)).length;
   const missingRatio = imgs.length ? Math.round((missingAlt / imgs.length) * 100) : 0;
   checks.push({
     id: "alt",
     axis: "seo",
     name: "이미지 대체 텍스트(alt)",
     detail: imgs.length
-      ? `이미지 ${imgs.length}개 중 ${missingAlt}개 누락 (${missingRatio}%)`
+      ? `이미지 ${imgs.length}개 중 ${missingAlt}개 누락 (${missingRatio}%)${emptyAlt ? ` · 빈 alt ${emptyAlt}개는 꾸밈 이미지로 보고 제외` : ""}`
       : "이미지가 없습니다",
     status: !imgs.length ? "warn" : missingRatio > 50 ? "fail" : missingRatio > 20 ? "warn" : "pass",
     fix: !imgs.length
