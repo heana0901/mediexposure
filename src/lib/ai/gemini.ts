@@ -14,10 +14,12 @@ function extractSources(response: GenerateContentResponse): Source[] {
 
   const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
   for (const chunk of chunks) {
-    const uri = chunk.web?.uri;
+    // 지도 그라운딩을 켜면 장소 카드(maps)도 근거로 들어온다
+    const ref = chunk.web ?? chunk.maps;
+    const uri = ref?.uri;
     if (!uri || seen.has(uri)) continue;
     seen.add(uri);
-    sources.push({ title: chunk.web?.title || uri, url: uri });
+    sources.push({ title: ref?.title || uri, url: uri });
   }
 
   return sources;
@@ -29,12 +31,16 @@ function sumTokens(...counts: (number | undefined)[]): number | null {
 }
 
 export async function askGemini(question: string, options: AskOptions = {}): Promise<AiCallResult> {
-  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const model = options.model || process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const maps = options.maps;
   const response = await getClient().models.generateContent({
     model,
     contents: question,
     config: {
-      tools: [{ googleSearch: {} }],
+      tools: maps ? [{ googleSearch: {} }, { googleMaps: {} }] : [{ googleSearch: {} }],
+      ...(maps
+        ? { toolConfig: { retrievalConfig: { latLng: maps, languageCode: "ko" } } }
+        : {}),
       ...(options.instructions ? { systemInstruction: options.instructions } : {}),
     },
   });

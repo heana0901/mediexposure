@@ -22,6 +22,12 @@ export type AskOptions = {
   /** 답변 형식을 못박는 시스템 지침 */
   instructions?: string;
   location?: LocationHint | null;
+  /** (조건 비교 실험용) 환경변수 대신 쓸 모델 */
+  model?: string;
+  /** (ChatGPT 실험용) false면 검색을 강제하지 않고 모델에 맡긴다. 기본은 강제 */
+  forceSearch?: boolean;
+  /** (Gemini 실험용) 구글 지도 그라운딩을 함께 켠다. 사용자 위치 좌표 */
+  maps?: { latitude: number; longitude: number } | null;
 };
 
 export type AskFn = (question: string, options?: AskOptions) => Promise<AiCallResult>;

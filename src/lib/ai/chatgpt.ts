@@ -64,6 +64,8 @@ async function createResponse(
     ...(options.instructions ? { instructions: options.instructions } : {}),
   };
 
+  if (options.forceSearch === false) return await getClient().responses.create(params);
+
   try {
     return await getClient().responses.create({ ...params, tool_choice: FORCE_WEB_SEARCH });
   } catch (err) {
@@ -109,7 +111,9 @@ function countWebSearchCalls(response: OpenAI.Responses.Response): number {
 }
 
 export async function askChatGPT(question: string, options: AskOptions = {}): Promise<AiCallResult> {
-  const model = process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  const model = options.model || process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  // 검색을 모델에 맡기는 실험에서는 채근 재시도도 하지 않는다
+  const maxAttempts = options.forceSearch === false ? 1 : MAX_ATTEMPTS;
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
   let searchCount = 0;
@@ -124,7 +128,7 @@ export async function askChatGPT(question: string, options: AskOptions = {}): Pr
     searchCount: 0,
   };
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // 강제 지정에도 검색을 건너뛴 경우에만 검색을 한 번 더 채근한다.
     const input = attempt === 0 ? question : `${question}\n\n${SEARCH_RETRY_NUDGE}`;
     const response = await createResponse(model, input, options);
