@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/monitor-all",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/monitor-all?slot=2",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/monitor-all?slot=3",
+      "schedule": "0 7 * * *"
     }
   ]
 }

@@ -32,23 +32,18 @@ type Config = {
 };
 
 const CONFIGS: Record<string, Config> = {
-  "gpt-current": { label: "ChatGPT 지금 설정 (기본 모델·검색 강제·위치)", provider: "chatgpt", withLocation: true },
+  "gpt-current": { label: "ChatGPT 지금 설정 (기본 모델·검색은 모델 판단·위치)", provider: "chatgpt", withLocation: true },
   "gpt-noloc": { label: "ChatGPT 지금 설정에서 위치만 뺌", provider: "chatgpt", withLocation: false },
-  "gpt-big-forced": {
-    label: "ChatGPT 상위 모델·검색 강제",
+  "gpt-forced": { label: "ChatGPT 지금 모델·검색 강제", provider: "chatgpt", forceSearch: true, withLocation: true },
+  "gpt-old": {
+    label: "ChatGPT 예전 설정 (gpt-5.4-mini·검색 강제)",
     provider: "chatgpt",
-    model: "gpt-5.5",
-    withLocation: true,
-  },
-  "gpt-big-auto": {
-    label: "ChatGPT 상위 모델·검색은 모델이 판단 (앱과 가까운 조건)",
-    provider: "chatgpt",
-    model: "gpt-5.5",
-    forceSearch: false,
+    model: "gpt-5.4-mini",
+    forceSearch: true,
     withLocation: true,
   },
   "gemini-current": { label: "Gemini 지금 설정 (기본 모델·구글 검색)", provider: "gemini", withLocation: true },
-  "gemini-pro": { label: "Gemini 상위 모델·구글 검색", provider: "gemini", model: "gemini-3.8-pro", withLocation: true },
+  "gemini-pro": { label: "Gemini 상위 모델·구글 검색", provider: "gemini", model: "gemini-pro-latest", withLocation: true },
   "gemini-maps": {
     label: "Gemini 지금 설정 + 구글 지도",
     provider: "gemini",
@@ -112,7 +107,7 @@ export async function GET() {
 
   return NextResponse.json({
     configs: Object.entries(CONFIGS).map(([key, c]) => ({ key, ...c })),
-    defaults: { openai: process.env.OPENAI_MODEL || "gpt-5.4-mini", gemini: process.env.GEMINI_MODEL || "gemini-3.8-flash" },
+    defaults: { openai: process.env.OPENAI_MODEL || "(코드 기본값)", gemini: process.env.GEMINI_MODEL || "(코드 기본값)", openaiForceSearch: process.env.OPENAI_FORCE_SEARCH === "1" },
     models,
   });
 }

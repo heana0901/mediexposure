@@ -9,7 +9,10 @@ import { assertClientAccess } from "@/lib/dal";
  * 이미 받은 답변은 반드시 저장되게 한다.
  */
 export const maxDuration = 300;
-const CALL_BUDGET_MS = 220_000;
+/** 새 AI 호출을 시작하지 않는 시점 */
+const CALL_BUDGET_MS = 170_000;
+/** 답을 기다리던 호출도 끊는 시점. 그 뒤 저장·네이버 기록까지 300초 안에 마친다 */
+const ABORT_MS = 255_000;
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
@@ -34,7 +37,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runMonitoringForClient(supabase, client, { deadline: startedAt + CALL_BUDGET_MS });
+    const result = await runMonitoringForClient(supabase, client, {
+      deadline: startedAt + CALL_BUDGET_MS,
+      abortAt: startedAt + ABORT_MS,
+    });
     if (!result) {
       return NextResponse.json({ error: "등록된 모니터링 질문이 없습니다." }, { status: 400 });
     }

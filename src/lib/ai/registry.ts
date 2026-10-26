@@ -52,9 +52,14 @@ export function getMaxSampleCount(): number {
   return Math.min(8, Math.max(1, Math.round(raw)));
 }
 
-/** AI별 동시 호출 수. 너무 높으면 제공자 쪽 분당 호출 한도(429)에 걸린다. */
-export function getConcurrency(): number {
-  const raw = Number(process.env.MONITOR_CONCURRENCY ?? 6);
-  if (!Number.isFinite(raw)) return 6;
+/**
+ * AI별 동시 호출 수. 너무 높으면 제공자 쪽 분당 호출 한도(429)에 걸린다.
+ * ChatGPT(gpt-5.5)는 한 번에 30초~2분이 걸려, 한 병원의 첫 회차 질문을 한꺼번에 보내야 시간 안에 끝난다.
+ */
+export function getConcurrency(provider?: Provider): number {
+  const fallback = provider === "chatgpt" ? 15 : 6;
+  const env = provider === "chatgpt" ? process.env.MONITOR_CHATGPT_CONCURRENCY : process.env.MONITOR_CONCURRENCY;
+  const raw = Number(env || fallback);
+  if (!Number.isFinite(raw)) return fallback;
   return Math.min(20, Math.max(1, Math.round(raw)));
 }

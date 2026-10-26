@@ -122,6 +122,11 @@ export type RunMonitoringOptions = {
    * 그때까지 받은 답변까지 통째로 잃는 일을 막는다. 이미 시작한 호출은 끝까지 기다린다.
    */
   deadline?: number;
+  /**
+   * 이 시각(ms)이 되면 아직 답을 기다리는 호출도 끊는다. 느린 답변 하나 때문에 함수 시간 한도를 넘겨
+   * 그때까지 받은 답변을 모두 잃는 일을 막는다. 끊긴 호출은 저장하지 않는다.
+   */
+  abortAt?: number;
 };
 
 type ClientForMonitoring = {
@@ -142,7 +147,7 @@ function aliasesOf(client: ClientForMonitoring): string[] {
 export async function runMonitoringForClient(
   supabase: SupabaseClient,
   client: ClientForMonitoring,
-  { deadline }: RunMonitoringOptions = {}
+  { deadline, abortAt }: RunMonitoringOptions = {}
 ) {
   const clientType = client.client_type ?? "hospital";
   const aliases = aliasesOf(client);
@@ -182,9 +187,10 @@ export async function runMonitoringForClient(
 
   if (runError || !run) throw new Error(runError?.message ?? "실행 생성 실패");
 
-  const concurrency = getConcurrency();
-  const limiters = new Map(providers.map((p) => [p, createLimiter(concurrency)]));
+  const limiters = new Map(providers.map((p) => [p, createLimiter(getConcurrency(p))]));
+  const signal = abortAt !== undefined ? AbortSignal.timeout(Math.max(1_000, abortAt - Date.now())) : undefined;
   let skippedForTime = 0;
+  let cutForTime = 0;
 
   type Task = { keyword: (typeof keywords)[number]; provider: Provider; sampleIndex: number };
   type Outcome = { failure: string | null; row: Record<string, unknown> | null; task: Task } | null;
@@ -200,8 +206,14 @@ export async function runMonitoringForClient(
       const phrasing = phrasingFor(keyword, sampleIndex);
       // 자연 질문 모드는 사람이 검색창에 치는 문장을 그대로 보낸다
       const question = queryMode === "list" ? buildSearchQuestion(phrasing, clientType, location) : phrasing;
-      const aiResult = await runProvider(provider, question, { instructions, location });
-      if (aiResult.failure) return { failure: aiResult.failure, row: null, task };
+      const aiResult = await runProvider(provider, question, { instructions, location, signal });
+      if (aiResult.failure) {
+        if (signal?.aborted) {
+          cutForTime += 1;
+          return { failure: null, row: null, task };
+        }
+        return { failure: aiResult.failure, row: null, task };
+      }
 
       const analysis = await safeAnalyze(aiResult.text, client.name, clientType, aliases);
       const providerCost =
@@ -274,14 +286,14 @@ export async function runMonitoringForClient(
   if (rows.length === 0) {
     await supabase.from("monitoring_runs").delete().eq("id", run.id);
     const reasons = unique(failures);
-    if (skippedForTime > 0) reasons.push("실행 시간 한도에 걸려 AI에 묻지 못했습니다.");
+    if (skippedForTime + cutForTime > 0) reasons.push("실행 시간 한도에 걸려 AI 답변을 받지 못했습니다.");
     throw new Error(reasons.join(" / ") || "AI 호출에 모두 실패했습니다.");
   }
 
   const warnings = unique(failures);
-  if (skippedForTime > 0) {
+  if (skippedForTime + cutForTime > 0) {
     warnings.push(
-      `실행 시간 한도 때문에 ${skippedForTime}건은 묻지 못했습니다. 질문 수를 줄이거나 MONITOR_SAMPLES를 낮춰 주세요.`
+      `실행 시간 한도 때문에 ${skippedForTime + cutForTime}건은 답변을 받지 못했습니다. 질문 수를 줄이거나 MONITOR_SAMPLES를 낮춰 주세요.`
     );
   }
 

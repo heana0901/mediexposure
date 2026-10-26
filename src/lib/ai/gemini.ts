@@ -42,6 +42,7 @@ export async function askGemini(question: string, options: AskOptions = {}): Pro
         ? { toolConfig: { retrievalConfig: { latLng: maps, languageCode: "ko" } } }
         : {}),
       ...(options.instructions ? { systemInstruction: options.instructions } : {}),
+      ...(options.signal ? { abortSignal: options.signal } : {}),
     },
   });
 
