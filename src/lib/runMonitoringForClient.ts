@@ -160,7 +160,7 @@ export async function runMonitoringForClient(
     queryMode === "list" ? buildSearchInstructions(clientType) : buildNaturalContext(location);
   const providers = getActiveProviders();
   const samples = getSampleCount();
-  const maxSamples = Math.max(samples, getMaxSampleCount());
+  const maxSamplesFor = (provider: Provider) => Math.max(samples, getMaxSampleCount(provider));
   const { data: keywords, error: keywordsError } = await selectActiveKeywords(supabase, client.id);
 
   if (keywordsError) throw new Error(keywordsError.message);
@@ -277,13 +277,14 @@ export async function runMonitoringForClient(
     groups.set(key, [...(groups.get(key) ?? []), firstOutcomes[i]]);
   });
   const extraOutcomes = [...groups.values()].map(async (pending): Promise<Outcome[]> => {
-    if (maxSamples <= samples) return [];
     const answered = (await Promise.all(pending)).filter((o) => o?.row);
     const hits = answered.filter((o) => o!.row!.mentioned).length;
     if (answered.length === 0 || hits === 0 || hits === answered.length) return [];
     const { keyword, provider } = answered[0]!.task;
+    const extra = maxSamplesFor(provider) - samples;
+    if (extra <= 0) return [];
     return Promise.all(
-      Array.from({ length: maxSamples - samples }, (_, i) => runTask({ keyword, provider, sampleIndex: samples + i }))
+      Array.from({ length: extra }, (_, i) => runTask({ keyword, provider, sampleIndex: samples + i }))
     );
   });
 

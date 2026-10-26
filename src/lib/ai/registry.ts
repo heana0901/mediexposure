@@ -46,9 +46,12 @@ export function getSampleCount(): number {
  * 결과가 갈린 질문(예: 3회 중 1~2회 노출)은 이 횟수까지 더 묻는다. 모두 노출이거나 모두 미노출이면
  * 더 물어도 숫자가 거의 바뀌지 않으니 기본 횟수에서 멈춘다. MONITOR_MAX_SAMPLES (기본 5, 최대 8)
  */
-export function getMaxSampleCount(): number {
-  const raw = Number(process.env.MONITOR_MAX_SAMPLES ?? 5);
-  if (!Number.isFinite(raw)) return 5;
+export function getMaxSampleCount(provider?: Provider): number {
+  // ChatGPT(gpt-5.5)는 한 번에 약 0.25달러라 기본 회차만 묻는다. 더 물으려면 MONITOR_CHATGPT_MAX_SAMPLES
+  const env = provider === "chatgpt" ? process.env.MONITOR_CHATGPT_MAX_SAMPLES : process.env.MONITOR_MAX_SAMPLES;
+  const fallback = provider === "chatgpt" ? getSampleCount() : 5;
+  const raw = Number(env || fallback);
+  if (!Number.isFinite(raw)) return fallback;
   return Math.min(8, Math.max(1, Math.round(raw)));
 }
 

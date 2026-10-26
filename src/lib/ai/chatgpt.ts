@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import type { LocationHint } from "../location";
 import type { AiCallResult, AskOptions, Source } from "./types";
 import { SEARCH_RETRY_NUDGE } from "./prompt";
 
@@ -36,11 +35,18 @@ const FORCE_WEB_SEARCH: OpenAI.Responses.ToolChoiceAllowed = {
   tools: [{ type: "web_search" }],
 };
 
-function buildTools(location?: LocationHint | null): OpenAI.Responses.Tool[] {
+/** 검색 자료량. 질문당 비용의 60% 이상이 여기서 나온다(2026-10 실측: high에서 입력 평균 3만 2천 토큰) */
+function searchContextSize(options: AskOptions): "low" | "medium" | "high" {
+  const env = process.env.OPENAI_SEARCH_CONTEXT;
+  return options.searchContext ?? (env === "low" || env === "medium" ? env : "high");
+}
+
+function buildTools(options: AskOptions): OpenAI.Responses.Tool[] {
+  const location = options.location;
   return [
     {
       type: "web_search",
-      search_context_size: "high",
+      search_context_size: searchContextSize(options),
       ...(location?.city || location?.region
         ? {
             user_location: {
@@ -73,7 +79,7 @@ async function createResponse(
   const params: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
     model,
     input,
-    tools: buildTools(options.location),
+    tools: buildTools(options),
     ...(options.instructions ? { instructions: options.instructions } : {}),
   };
 

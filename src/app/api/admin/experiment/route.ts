@@ -27,6 +27,7 @@ type Config = {
   provider: "chatgpt" | "gemini";
   model?: string;
   forceSearch?: boolean;
+  searchContext?: "low" | "medium" | "high";
   withLocation: boolean;
   maps?: boolean;
 };
@@ -34,6 +35,18 @@ type Config = {
 const CONFIGS: Record<string, Config> = {
   "gpt-current": { label: "ChatGPT 지금 설정 (기본 모델·검색은 모델 판단·위치)", provider: "chatgpt", withLocation: true },
   "gpt-noloc": { label: "ChatGPT 지금 설정에서 위치만 뺌", provider: "chatgpt", withLocation: false },
+  "gpt-medium": {
+    label: "ChatGPT 지금 설정에서 검색 자료량만 보통(medium)",
+    provider: "chatgpt",
+    searchContext: "medium",
+    withLocation: true,
+  },
+  "gpt-low": {
+    label: "ChatGPT 지금 설정에서 검색 자료량만 적게(low)",
+    provider: "chatgpt",
+    searchContext: "low",
+    withLocation: true,
+  },
   "gpt-forced": { label: "ChatGPT 지금 모델·검색 강제", provider: "chatgpt", forceSearch: true, withLocation: true },
   "gpt-old": {
     label: "ChatGPT 예전 설정 (gpt-5.4-mini·검색 강제)",
@@ -148,6 +161,7 @@ export async function POST(request: Request) {
     location,
     model,
     forceSearch: config.forceSearch,
+    searchContext: config.searchContext,
     maps,
   };
 
@@ -182,6 +196,8 @@ export async function POST(request: Request) {
             sources: r.sources.slice(0, 8).map((s) => s.url),
             answer: r.text.slice(0, 600),
             costUsd: r.costUsd ?? estimateCostUsd(r.model, r.inputTokens, r.outputTokens, r.searchCount),
+            inputTokens: r.inputTokens,
+            outputTokens: r.outputTokens,
             ms: Date.now() - t0,
             error: null as string | null,
           };
@@ -200,6 +216,8 @@ export async function POST(request: Request) {
             sources: [],
             answer: "",
             costUsd: null,
+            inputTokens: null,
+            outputTokens: null,
             ms: Date.now() - t0,
             error: err instanceof Error ? err.message.slice(0, 300) : String(err),
           };
