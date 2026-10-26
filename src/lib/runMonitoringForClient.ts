@@ -116,6 +116,9 @@ function stripColumns(row: Record<string, unknown>, columns: string[]): Record<s
   return legacy;
 }
 
+/** 호출 하나가 이보다 오래 걸리면 끊는다. gpt-5.5 실측 중앙값 37초·최대 2분 남짓 */
+const CALL_TIMEOUT_MS = 150_000;
+
 export type RunMonitoringOptions = {
   /**
    * 이 시각(ms) 이후에는 새 AI 호출을 시작하지 않는다. 서버 함수 실행 시간 한도에 걸려
@@ -189,8 +192,13 @@ export async function runMonitoringForClient(
 
   const limiters = new Map(providers.map((p) => [p, createLimiter(getConcurrency(p))]));
   const signal = abortAt !== undefined ? AbortSignal.timeout(Math.max(1_000, abortAt - Date.now())) : undefined;
-  let skippedForTime = 0;
-  let cutForTime = 0;
+  // 시간 때문에 답을 못 받은 호출 수. 기본 회차와 추가 회차(결과가 갈린 질문)를 나눠 센다.
+  let missedBase = 0;
+  let missedExtra = 0;
+  const missed = (task: Task) => {
+    if (task.sampleIndex < samples) missedBase += 1;
+    else missedExtra += 1;
+  };
 
   type Task = { keyword: (typeof keywords)[number]; provider: Provider; sampleIndex: number };
   type Outcome = { failure: string | null; row: Record<string, unknown> | null; task: Task } | null;
@@ -198,7 +206,7 @@ export async function runMonitoringForClient(
   const runTask = (task: Task): Promise<Outcome> =>
     limiters.get(task.provider)!(async () => {
       if (deadline !== undefined && Date.now() > deadline) {
-        skippedForTime += 1;
+        missed(task);
         return null;
       }
 
@@ -206,10 +214,14 @@ export async function runMonitoringForClient(
       const phrasing = phrasingFor(keyword, sampleIndex);
       // 자연 질문 모드는 사람이 검색창에 치는 문장을 그대로 보낸다
       const question = queryMode === "list" ? buildSearchQuestion(phrasing, clientType, location) : phrasing;
-      const aiResult = await runProvider(provider, question, { instructions, location, signal });
+      // 유난히 오래 걸리는 답변 하나가 다른 질문의 추가 측정까지 막지 않도록 호출마다 시간 상한을 둔다
+      const callSignal = signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(CALL_TIMEOUT_MS)])
+        : AbortSignal.timeout(CALL_TIMEOUT_MS);
+      const aiResult = await runProvider(provider, question, { instructions, location, signal: callSignal });
       if (aiResult.failure) {
-        if (signal?.aborted) {
-          cutForTime += 1;
+        if (callSignal.aborted) {
+          missed(task);
           return { failure: null, row: null, task };
         }
         return { failure: aiResult.failure, row: null, task };
@@ -255,28 +267,27 @@ export async function runMonitoringForClient(
   const firstWave = Array.from({ length: samples }, (_, sampleIndex) =>
     keywords.flatMap((keyword) => providers.map((provider) => ({ keyword, provider, sampleIndex })))
   ).flat();
-  const outcomes: Outcome[] = await Promise.all(firstWave.map(runTask));
+  const firstOutcomes = firstWave.map(runTask);
 
   // 결과가 갈린 질문(예: 3회 중 1~2회 노출)만 더 물어 확률을 좁힌다. 모두 노출/모두 미노출이면 그대로 둔다.
-  if (maxSamples > samples) {
-    const groups = new Map<string, { task: Task; hits: number; total: number }>();
-    for (const o of outcomes) {
-      if (!o?.row) continue;
-      const key = `${o.task.keyword.id}|${o.task.provider}`;
-      const g = groups.get(key) ?? { task: o.task, hits: 0, total: 0 };
-      g.total += 1;
-      if (o.row.mentioned) g.hits += 1;
-      groups.set(key, g);
-    }
-    const extra: Task[] = [];
-    for (const g of groups.values()) {
-      if (g.hits === 0 || g.hits === g.total) continue;
-      for (let sampleIndex = samples; sampleIndex < maxSamples; sampleIndex++) {
-        extra.push({ keyword: g.task.keyword, provider: g.task.provider, sampleIndex });
-      }
-    }
-    outcomes.push(...(await Promise.all(extra.map(runTask))));
-  }
+  // 질문·AI별로 기본 회차가 끝나는 대로 바로 이어서 묻는다. 느린 AI를 기다리느라 빠른 AI의 추가 측정이 밀리지 않게 하기 위해서다.
+  const groups = new Map<string, Promise<Outcome>[]>();
+  firstWave.forEach((task, i) => {
+    const key = `${task.keyword.id}|${task.provider}`;
+    groups.set(key, [...(groups.get(key) ?? []), firstOutcomes[i]]);
+  });
+  const extraOutcomes = [...groups.values()].map(async (pending): Promise<Outcome[]> => {
+    if (maxSamples <= samples) return [];
+    const answered = (await Promise.all(pending)).filter((o) => o?.row);
+    const hits = answered.filter((o) => o!.row!.mentioned).length;
+    if (answered.length === 0 || hits === 0 || hits === answered.length) return [];
+    const { keyword, provider } = answered[0]!.task;
+    return Promise.all(
+      Array.from({ length: maxSamples - samples }, (_, i) => runTask({ keyword, provider, sampleIndex: samples + i }))
+    );
+  });
+
+  const outcomes: Outcome[] = [...(await Promise.all(firstOutcomes)), ...(await Promise.all(extraOutcomes)).flat()];
 
   const attempted = outcomes.filter((o): o is NonNullable<typeof o> => o !== null);
   const failures = attempted.map((o) => o.failure).filter((f): f is string => Boolean(f));
@@ -286,15 +297,18 @@ export async function runMonitoringForClient(
   if (rows.length === 0) {
     await supabase.from("monitoring_runs").delete().eq("id", run.id);
     const reasons = unique(failures);
-    if (skippedForTime + cutForTime > 0) reasons.push("실행 시간 한도에 걸려 AI 답변을 받지 못했습니다.");
+    if (missedBase + missedExtra > 0) reasons.push("실행 시간 한도에 걸려 AI 답변을 받지 못했습니다.");
     throw new Error(reasons.join(" / ") || "AI 호출에 모두 실패했습니다.");
   }
 
   const warnings = unique(failures);
-  if (skippedForTime + cutForTime > 0) {
+  if (missedBase > 0) {
     warnings.push(
-      `실행 시간 한도 때문에 ${skippedForTime + cutForTime}건은 답변을 받지 못했습니다. 질문 수를 줄이거나 MONITOR_SAMPLES를 낮춰 주세요.`
+      `실행 시간 한도 때문에 기본 측정 ${missedBase}건은 답변을 받지 못했습니다. 계속 반복되면 질문 수를 줄이거나 MONITOR_SAMPLES를 낮춰 주세요.`
     );
+  }
+  if (missedExtra > 0) {
+    warnings.push(`결과가 갈린 질문의 추가 측정 ${missedExtra}건은 시간이 모자라 건너뛰었습니다(기본 ${samples}회 측정은 반영됨).`);
   }
 
   const insertResults = (toInsert: Record<string, unknown>[]) =>
